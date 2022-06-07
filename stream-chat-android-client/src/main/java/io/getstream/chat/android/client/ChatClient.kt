@@ -153,6 +153,7 @@ import io.getstream.chat.android.core.internal.InternalStreamChatApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
 import java.io.File
@@ -984,21 +985,23 @@ internal constructor(
     }
 
     public fun disconnect() {
-        logger.logI("[disconnect] no args")
-        notifications.onLogout()
-        // fire a handler here that the chatDomain and chatUI can use
-        getCurrentUser().let(initializationCoordinator::userDisconnected)
-        if (ToggleService.isSocketExperimental().not()) {
-            socketStateService.onDisconnectRequested()
-            userStateService.onLogout()
-            socket.disconnect()
-        } else {
-            userStateService.onLogout()
-            chatSocketExperimental.disconnect(DisconnectCause.ConnectionReleased)
+        runBlocking(scope.coroutineContext) {
+            logger.logI("[disconnect] no args")
+            notifications.onLogout()
+            // fire a handler here that the chatDomain and chatUI can use
+            getCurrentUser().let(initializationCoordinator::userDisconnected)
+            if (ToggleService.isSocketExperimental().not()) {
+                socketStateService.onDisconnectRequested()
+                userStateService.onLogout()
+                socket.disconnect()
+            } else {
+                userStateService.onLogout()
+                chatSocketExperimental.disconnect(DisconnectCause.ConnectionReleased)
+            }
+            userCredentialStorage.clear()
+            lifecycleObserver.dispose()
+            appSettingsManager.clear()
         }
-        userCredentialStorage.clear()
-        lifecycleObserver.dispose()
-        appSettingsManager.clear()
     }
 
     //region: api calls
