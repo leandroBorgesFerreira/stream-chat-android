@@ -25,6 +25,7 @@ import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import io.getstream.chat.android.client.api.ChatApi
 import io.getstream.chat.android.client.api.ChatClientConfig
 import io.getstream.chat.android.client.api.ErrorCall
@@ -183,11 +184,13 @@ internal constructor(
     private val initializationCoordinator: InitializationCoordinator = InitializationCoordinator.getOrCreate(),
     private val appSettingsManager: AppSettingManager,
     private val chatSocketExperimental: ChatSocketExperimental,
+    lifecycle: Lifecycle,
 ) {
     private val logger = ChatLogger.get("Client")
     private val waitConnection = MutableSharedFlow<Result<ConnectionData>>()
     private val eventsObservable = ChatEventsObservable(socket, waitConnection, scope, chatSocketExperimental)
     private val lifecycleObserver = StreamLifecycleObserver(
+        lifecycle,
         object : LifecycleHandler {
             override fun resume() = reconnectSocket()
             override fun stopped() {
@@ -2594,7 +2597,8 @@ internal constructor(
                 scope = module.networkScope,
                 retryPolicy = retryPolicy,
                 appSettingsManager = appSettingsManager,
-                chatSocketExperimental = module.experimentalSocket()
+                chatSocketExperimental = module.experimentalSocket(),
+                lifecycle = ProcessLifecycleOwner.get().lifecycle
             ).also {
                 configureInitializer(it)
             }
