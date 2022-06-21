@@ -70,13 +70,18 @@ internal class PushTokenUpdateHandler(context: Context) {
     }
 
     suspend fun removeStoredDevice() {
+        logger.logD("[JcLog] removing stored device")
         userPushToken.toDevice()
             .takeIf { it.isValid() }
             ?.let {
-                if (ChatClient.instance().deleteDevice(it).await().isSuccess) {
+                logger.logD("Deleting device on backend")
+                val result = ChatClient.instance().deleteDevice(it).await()
+                logger.logD("Result of deleting device: $result")
+                if (result.isSuccess) {
                     userPushToken = UserPushToken("", "", "", null)
                 }
             }
+        logger.logD("[JcLog] Completed removing stored device")
     }
 
     private data class UserPushToken(

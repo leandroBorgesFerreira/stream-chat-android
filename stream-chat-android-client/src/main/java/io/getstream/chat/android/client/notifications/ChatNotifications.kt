@@ -93,9 +93,13 @@ internal class ChatNotificationsImpl constructor(
     }
 
     override suspend fun onLogout() {
+        logger.logD("onLogout")
         handler.dismissAllNotifications()
+        logger.logD("handler dismissAllNotification")
         removeStoredDevice()
+        logger.logD("removeStoredDevice")
         cancelLoadDataWork()
+        logger.logD("cancelLoadDataWork")
     }
 
     private fun cancelLoadDataWork() {

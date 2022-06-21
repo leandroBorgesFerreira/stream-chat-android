@@ -76,14 +76,19 @@ public interface Call<T : Any> {
  */
 public suspend fun <T : Any> Call<T>.await(): Result<T> {
     if (this is CoroutineCall<T>) {
+        println("[JcLog] It is a CoroutineCall")
         return this.awaitImpl()
     }
+    println("[JcLog] It isn't a CoroutineCall: $this")
     return suspendCancellableCoroutine { continuation ->
+        println("[JcLog] Inside block of CancellableContinuation")
         this.enqueue { result ->
+            println("[JcLog] returning a result")
             continuation.resume(result)
         }
 
         continuation.invokeOnCancellation {
+            println("[JcLog] invokeOnCancelation: $it")
             this.cancel()
         }
     }

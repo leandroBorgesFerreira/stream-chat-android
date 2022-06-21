@@ -43,17 +43,17 @@ internal class MapCall<T : Any, K : Any>(
     }
 
     override fun enqueue(callback: Call.Callback<K>) {
-        call.enqueue callback@{
-            if (canceled.get()) {
-                return@callback
-            }
-
-            if (it.isSuccess) {
-                val data = mapper(it.data())
-                callback.onResult(Result(data))
-            } else {
-                val error = it.error()
-                callback.onResult(Result(error))
+        println("[JcLog] MapCall.enqueue with call: $call")
+        call.enqueue {
+            println("[JcLog] MappCall result $it")
+            if (!canceled.get()) {
+                if (it.isSuccess) {
+                    val data = mapper(it.data())
+                    callback.onResult(Result(data))
+                } else {
+                    val error = it.error()
+                    callback.onResult(Result(error))
+                }
             }
         }
     }

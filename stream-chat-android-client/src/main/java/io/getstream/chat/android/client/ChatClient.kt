@@ -985,11 +985,14 @@ internal constructor(
     }
 
     public fun disconnect() {
-        runBlocking(scope.coroutineContext) {
-            logger.logI("[disconnect] no args")
+        CoroutineCall(scope) {
+        // runBlocking(scope.coroutineContext) {
+            logger.logI("[JcLog] [disconnect] no args")
             notifications.onLogout()
+            logger.logI("[JcLog] [disconnect] notifications on logout")
             // fire a handler here that the chatDomain and chatUI can use
             getCurrentUser().let(initializationCoordinator::userDisconnected)
+            logger.logI("[JcLog] [disconnect] get currentUser initializationCoordinator")
             if (ToggleService.isSocketExperimental().not()) {
                 socketStateService.onDisconnectRequested()
                 userStateService.onLogout()
@@ -998,10 +1001,16 @@ internal constructor(
                 userStateService.onLogout()
                 chatSocketExperimental.disconnect(DisconnectCause.ConnectionReleased)
             }
+            logger.logI("[JcLog] [disconnect] After else")
             userCredentialStorage.clear()
+            logger.logI("[JcLog] [disconnect] userCredentialsStorage clear")
             lifecycleObserver.dispose()
+            logger.logI("[JcLog] [disconnect] lifecycleObserver dispose")
             appSettingsManager.clear()
+            logger.logI("[JcLog] [disconnect] appSettingsManager clear")
+            Result.success(Unit)
         }
+            .execute()
     }
 
     //region: api calls

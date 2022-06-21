@@ -22,102 +22,122 @@ import io.getstream.chat.android.client.errors.ChatNetworkError
 import io.getstream.chat.android.client.errors.ChatRequestError
 import io.getstream.chat.android.client.parser.ChatParser
 import io.getstream.chat.android.client.utils.Result
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import retrofit2.Callback
 import retrofit2.Response
+import retrofit2.awaitResponse
+import java.io.IOException
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicBoolean
 
 internal class RetrofitCall<T : Any>(
-    val call: retrofit2.Call<T>,
-    private val parser: ChatParser,
+    private val call: retrofit2.Call<T>,
+    parser: ChatParser,
+    scope: CoroutineScope,
     private val callbackExecutor: Executor,
-) : Call<T> {
+) : CoroutineCall<T>(scope, call.asSuspendResult(parser)) {
 
     private var canceled = AtomicBoolean(false)
 
     override fun cancel() {
+        super.cancel()
         canceled.set(true)
         call.cancel()
     }
 
-    override fun execute(): Result<T> {
-        return execute(call)
+    // override fun execute(): Result<T> {
+    //     return execute(call)
+    // }
+
+    // override fun enqueue(callback: Call.Callback<T>) {
+    //     println("[JcLog] RetrofitCall.enqueue")
+    //     enqueue(call) {
+    //         println("[JcLog] enqueue result: $it")
+    //         if (!canceled.get()) {
+    //             callback.onResult(it)
+    //         }
+    //     }
+    // }
+    //
+    // private fun execute(call: retrofit2.Call<T>): Result<T> {
+    //     return getResult(call)
+    // }
+    //
+    // private fun enqueue(call: retrofit2.Call<T>, callback: (Result<T>) -> Unit) {
+    //     println("[JcLog] RetrofitCall.enqueue retrofit call")
+    //     call.enqueue(
+    //         object : Callback<T> {
+    //             override fun onResponse(call: retrofit2.Call<T>, response: Response<T>) {
+    //                 println("[JcLog] RetrofitCall.onRespose $response").also {  }
+    //                 callbackExecutor.execute {
+    //                     callback(getResult(response))
+    //                 }
+    //             }
+    //
+    //             override fun onFailure(call: retrofit2.Call<T>, t: Throwable) {
+    //                 println("[JcLog] RetrofitCall.onFailure $t")
+    //                 println("[JcLog] callbackExecutor $callbackExecutor")
+    //                 callbackExecutor.execute {
+    //                     println("[JcLog] RetrofitCall.callbackExecutor.execute")
+    //                     callback(failedResult(t))
+    //                 }
+    //             }
+    //         }
+    //     )
+    // }
+}
+
+private fun <T : Any> retrofit2.Call<T>.asSuspendResult(parser: ChatParser): suspend CoroutineScope.() -> Result<T> =
+    {
+        println("[JcLog] Executing call")
+        getResult(parser, this@asSuspendResult).also { println("[JcLog] Returning result $it") }
     }
 
-    override fun enqueue(callback: Call.Callback<T>) {
-        enqueue(call) {
-            if (!canceled.get()) {
-                callback.onResult(it)
-            }
+private fun <T: Any> failedResult(t: Throwable): Result<T> {
+    return Result(failedError(t))
+}
+
+private fun failedError(t: Throwable): ChatError {
+    return when (t) {
+        is ChatRequestError -> {
+            ChatNetworkError.create(t.streamCode, t.message.toString(), t.statusCode, t.cause)
+        }
+        else -> {
+            ChatNetworkError.create(ChatErrorCode.NETWORK_FAILED, t)
         }
     }
+}
 
-    private fun execute(call: retrofit2.Call<T>): Result<T> {
-        return getResult(call)
+@Suppress("TooGenericExceptionCaught")
+private suspend fun <T: Any> getResult(parser: ChatParser, retroCall: retrofit2.Call<T>): Result<T> = withContext(Dispatchers.IO){
+    try {
+        println("[JcLog] Executing retroCall")
+        val retrofitResponse = retroCall.execute()
+        println("[JcLog] retrofitResponse $retrofitResponse")
+        getResult(parser, retrofitResponse)
+    } catch (t: IOException) {
+        println("[JcLog] on catch $t")
+        failedResult(t)
     }
+}
 
-    private fun enqueue(call: retrofit2.Call<T>, callback: (Result<T>) -> Unit) {
-        call.enqueue(
-            object : Callback<T> {
-                override fun onResponse(call: retrofit2.Call<T>, response: Response<T>) {
-                    callbackExecutor.execute {
-                        callback(getResult(response))
-                    }
-                }
-
-                override fun onFailure(call: retrofit2.Call<T>, t: Throwable) {
-                    callbackExecutor.execute {
-                        callback(failedResult(t))
-                    }
-                }
-            }
-        )
-    }
-
-    private fun failedResult(t: Throwable): Result<T> {
-        return Result(failedError(t))
-    }
-
-    private fun failedError(t: Throwable): ChatError {
-        return when (t) {
-            is ChatError -> {
-                t
-            }
-            is ChatRequestError -> {
-                ChatNetworkError.create(t.streamCode, t.message.toString(), t.statusCode, t.cause)
-            }
-            else -> {
-                ChatNetworkError.create(ChatErrorCode.NETWORK_FAILED, t)
-            }
-        }
-    }
-
-    @Suppress("TooGenericExceptionCaught")
-    private fun getResult(retroCall: retrofit2.Call<T>): Result<T> {
-        return try {
-            val retrofitResponse = retroCall.execute()
-            getResult(retrofitResponse)
+@Suppress("TooGenericExceptionCaught")
+private fun <T: Any> getResult(parser: ChatParser, retrofitResponse: Response<T>): Result<T> {
+    return if (retrofitResponse.isSuccessful) {
+        try {
+            Result(retrofitResponse.body()!!)
         } catch (t: Throwable) {
-            failedResult(t)
+            Result(failedError(t))
         }
-    }
+    } else {
+        val errorBody = retrofitResponse.errorBody()
 
-    @Suppress("TooGenericExceptionCaught")
-    private fun getResult(retrofitResponse: Response<T>): Result<T> {
-        return if (retrofitResponse.isSuccessful) {
-            try {
-                Result(retrofitResponse.body()!!)
-            } catch (t: Throwable) {
-                Result(failedError(t))
-            }
+        if (errorBody != null) {
+            Result(parser.toError(errorBody))
         } else {
-            val errorBody = retrofitResponse.errorBody()
-
-            if (errorBody != null) {
-                Result(parser.toError(errorBody))
-            } else {
-                Result(parser.toError(retrofitResponse.raw()))
-            }
+            Result(parser.toError(retrofitResponse.raw()))
         }
     }
 }

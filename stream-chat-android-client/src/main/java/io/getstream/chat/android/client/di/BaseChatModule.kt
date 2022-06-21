@@ -149,7 +149,7 @@ internal open class BaseChatModule(
             .baseUrl(endpoint)
             .client(okHttpClient)
             .also(parser::configRetrofit)
-            .addCallAdapterFactory(RetrofitCallAdapterFactory.create(parser, callbackExecutor))
+            .addCallAdapterFactory(RetrofitCallAdapterFactory.create(parser, callbackExecutor, networkScope))
             .build()
     }
 
