@@ -24,6 +24,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
+import java.util.concurrent.atomic.AtomicBoolean
 
 @InternalStreamChatApi
 public open class CoroutineCall<T : Any>(
@@ -32,28 +34,26 @@ public open class CoroutineCall<T : Any>(
 ) : Call<T> {
 
     private var job: Job? = null
+    private val canceled = AtomicBoolean(false)
 
-    internal suspend fun awaitImpl(): Result<T> {
-        return withContext(scope.coroutineContext) {
-            suspendingTask()
-        }
+    override suspend fun await(): Result<T> = withContext(scope.coroutineContext) {
+        suspendingTask().takeUnless { canceled.get() } ?: callCanceledError()
     }
 
     override fun cancel() {
+        canceled.set(true)
         job?.cancel()
     }
 
     override fun execute(): Result<T> {
-        return runBlocking(context = scope.coroutineContext, block = suspendingTask)
+        return runBlocking { await() }
     }
 
     override fun enqueue(callback: Call.Callback<T>) {
         job = scope.launch {
-            val result = suspendingTask()
-            println("[JcLog] CoroutineCall result: $result")
-            withContext(DispatcherProvider.Main) {
-                callback.onResult(result)
-            }
+            val result = await()
+            yield()
+            withContext(DispatcherProvider.Main) { callback.onResult(result) }
         }
     }
 }

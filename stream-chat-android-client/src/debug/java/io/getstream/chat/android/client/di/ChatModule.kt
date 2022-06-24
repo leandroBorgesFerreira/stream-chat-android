@@ -39,7 +39,6 @@ internal class ChatModule(
     notificationConfig: NotificationConfig,
     uploader: FileUploader?,
     tokenManager: TokenManager,
-    callbackExecutor: Executor?,
     customOkHttpClient: OkHttpClient?,
 ) : BaseChatModule(
     appContext,
@@ -48,7 +47,6 @@ internal class ChatModule(
     notificationConfig,
     uploader,
     tokenManager,
-    callbackExecutor,
     customOkHttpClient,
 ) {
 

@@ -57,9 +57,15 @@ public interface Call<T : Any> {
     public fun enqueue(): Unit = enqueue {}
 
     /**
-     * Cancels the execution of the call, if cancellation is supported for the operation.
+     * Awaits the result of [this] Call in a suspending way, asynchronously.
+     * Safe to call from any CoroutineContext.
      *
-     * Note that calls can not be cancelled when running them with [execute].
+     * Does not throw exceptions. Any errors will be wrapped in the [Result] that's returned.
+     */
+    public suspend fun await(): Result<T>
+
+    /**
+     * Cancels the execution of the call, if cancellation is supported for the operation.
      */
     public fun cancel()
 
@@ -68,31 +74,10 @@ public interface Call<T : Any> {
     }
 }
 
-/**
- * Awaits the result of [this] Call in a suspending way, asynchronously.
- * Safe to call from any CoroutineContext.
- *
- * Does not throw exceptions. Any errors will be wrapped in the [Result] that's returned.
- */
-public suspend fun <T : Any> Call<T>.await(): Result<T> {
-    if (this is CoroutineCall<T>) {
-        println("[JcLog] It is a CoroutineCall")
-        return this.awaitImpl()
-    }
-    println("[JcLog] It isn't a CoroutineCall: $this")
-    return suspendCancellableCoroutine { continuation ->
-        println("[JcLog] Inside block of CancellableContinuation")
-        this.enqueue { result ->
-            println("[JcLog] returning a result")
-            continuation.resume(result)
-        }
 
-        continuation.invokeOnCancellation {
-            println("[JcLog] invokeOnCancelation: $it")
-            this.cancel()
-        }
-    }
-}
+@InternalStreamChatApi
+public fun <T: Any> Call<T>.callCanceledError(): Result<T> =
+    Result.error(ChatError("The call was canceled before complete its execution"))
 
 /**
  * Runs a call using coroutines scope

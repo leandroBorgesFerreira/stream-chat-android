@@ -21,6 +21,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
+import java.util.concurrent.atomic.AtomicBoolean
 
 internal class DoOnStartCall<T : Any>(
     private val originalCall: Call<T>,
@@ -29,20 +32,30 @@ internal class DoOnStartCall<T : Any>(
 ) : Call<T> {
 
     private var job: Job? = null
+    private val canceled = AtomicBoolean(false)
 
-    override fun execute(): Result<T> = runBlocking {
-        sideEffect()
-        originalCall.execute()
-    }
+    override fun execute(): Result<T> = runBlocking { await() }
 
     override fun enqueue(callback: Call.Callback<T>) {
         job = scope.launch {
             sideEffect()
+            yield()
             originalCall.enqueue(callback)
         }
     }
 
     override fun cancel() {
+        canceled.set(true)
+        originalCall.cancel()
         job?.cancel()
+    }
+
+    override suspend fun await(): Result<T> = withContext(scope.coroutineContext) {
+        sideEffect()
+        originalCall
+            .takeUnless { canceled.get() }
+            ?.await()
+            .takeUnless { canceled.get() }
+            ?: callCanceledError()
     }
 }

@@ -81,7 +81,6 @@ internal open class BaseChatModule(
     private val notificationConfig: NotificationConfig,
     private val fileUploader: FileUploader? = null,
     private val tokenManager: TokenManager = TokenManagerImpl(),
-    private val callbackExecutor: Executor?,
     private val customOkHttpClient: OkHttpClient? = null,
     private val httpClientConfig: (OkHttpClient.Builder) -> OkHttpClient.Builder = { it },
 ) {
@@ -149,7 +148,7 @@ internal open class BaseChatModule(
             .baseUrl(endpoint)
             .client(okHttpClient)
             .also(parser::configRetrofit)
-            .addCallAdapterFactory(RetrofitCallAdapterFactory.create(parser, callbackExecutor, networkScope))
+            .addCallAdapterFactory(RetrofitCallAdapterFactory.create(parser, networkScope))
             .build()
     }
 
@@ -255,7 +254,7 @@ internal open class BaseChatModule(
             chatConfig.distinctApiCalls
         }
     }.let { originalApi ->
-        ExtraDataValidator(originalApi)
+        ExtraDataValidator(networkScope, originalApi)
     }
 
     private inline fun <reified T> buildRetrofitApi(): T {

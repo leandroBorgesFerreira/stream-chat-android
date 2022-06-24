@@ -16,26 +16,17 @@
 
 package io.getstream.chat.android.client.api
 
-import android.os.Handler
-import android.os.Looper
-import android.provider.Settings
 import io.getstream.chat.android.client.call.Call
 import io.getstream.chat.android.client.call.RetrofitCall
 import io.getstream.chat.android.client.parser.ChatParser
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.asExecutor
-import kotlinx.coroutines.launch
 import retrofit2.CallAdapter
 import retrofit2.Retrofit
 import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
-import java.util.concurrent.Executor
 
 internal class RetrofitCallAdapterFactory private constructor(
     private val chatParser: ChatParser,
-    private val callbackExecutor: Executor,
     private val coroutineScope: CoroutineScope,
 ) : CallAdapter.Factory() {
 
@@ -51,43 +42,24 @@ internal class RetrofitCallAdapterFactory private constructor(
             throw IllegalArgumentException("Call return type must be parameterized as Call<Foo>")
         }
         val responseType: Type = getParameterUpperBound(0, returnType)
-        return RetrofitCallAdapter<Any>(responseType, chatParser, callbackExecutor, coroutineScope)
+        return RetrofitCallAdapter<Any>(responseType, chatParser, coroutineScope)
     }
 
     companion object {
-        private val mainThreadExecutor: Executor = object : Executor {
-            // val handler: Handler by lazy { Handler(Looper.getMainLooper()) }
-            override fun execute(command: Runnable?) {
-                println("[JcLog] executing command: $command")
-                // println("[JcLog] handler: $handler")
-                GlobalScope.launch(Dispatchers.Main) {
-                    println("[JcLog] inside of runBlocking: $command")
-                }
-                command?.run()
-                // command?.let(handler::post)
-            }
-        }
-
-        private val coroutineExecutor = Dispatchers.IO.asExecutor()
-
         fun create(
             chatParser: ChatParser,
-            callbackExecutor: Executor? = null,
             coroutineScope: CoroutineScope,
-        ): RetrofitCallAdapterFactory = RetrofitCallAdapterFactory(chatParser, callbackExecutor ?: coroutineExecutor, coroutineScope)
+        ): RetrofitCallAdapterFactory = RetrofitCallAdapterFactory(chatParser, coroutineScope)
     }
 }
 
 internal class RetrofitCallAdapter<T : Any>(
     private val responseType: Type,
     private val parser: ChatParser,
-    private val callbackExecutor: Executor,
     private val coroutineScope: CoroutineScope,
 ) : CallAdapter<T, Call<T>> {
-
-    override fun adapt(call: retrofit2.Call<T>): Call<T> {
-        return RetrofitCall(call, parser, coroutineScope, callbackExecutor)
-    }
-
     override fun responseType(): Type = responseType
+    override fun adapt(call: retrofit2.Call<T>): Call<T> {
+        return RetrofitCall(call, parser, coroutineScope)
+    }
 }
