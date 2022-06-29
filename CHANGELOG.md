@@ -19,6 +19,7 @@
 ### ✅ Added
 
 ### ⚠️ Changed
+-. `Call` interface provides an `await()` suspend function implemented on every subclass and is not needed to use the extension function anymore. [#3807](https://github.com/GetStream/stream-chat-android/pull/3807)
 
 ### ❌ Removed
 
