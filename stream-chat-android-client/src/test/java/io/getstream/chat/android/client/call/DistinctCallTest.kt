@@ -1,5 +1,6 @@
 package io.getstream.chat.android.client.call
 
+import io.getstream.chat.android.client.BlockedCall
 import io.getstream.chat.android.client.Mother
 import io.getstream.chat.android.client.utils.Result
 import io.getstream.chat.android.test.AsyncTestCall
@@ -57,6 +58,35 @@ internal class DistinctCallTest {
         spyCallBuilder.assertInvocationCount { invocationCount ->
             invocationCount `should be equal to` 1
         }
+    }
+
+    @Test
+    fun Deadlock() = runTest {
+        val heavyCall = BlockedCall(expectedResult)
+        val spyCallBuilder = SpyCallBuilder(heavyCall)
+        val call = DistinctCall(spyCallBuilder, uniqueKey) { }
+
+        val deferredResult = (0..positiveRandomInt(10)).map { index ->
+            async {
+                call.await().also {
+                    if (index % 2 == 0) {
+                        // Call is canceled randomly
+                        call.cancel()
+                    }
+                }
+            }
+        }
+
+        // HeavyCall is completed
+        heavyCall.unblock()
+
+        deferredResult.forEach {
+            // We want to check the deferred result we launch before from another part of our code that doesn't know the call was cancelled
+            it.await() `should be equal to` expectedResult
+        }
+        println("This message won't be shown because some pending call will be stopped forever")
+
+        // Test will fail because `runTest { }` has 60 seconds timeout
     }
 
     private class SpyCallBuilder<T : Any>(
