@@ -37,7 +37,6 @@ import io.getstream.chat.android.client.models.Member
 import io.getstream.chat.android.client.models.Message
 import io.getstream.chat.android.client.models.Reaction
 import io.getstream.logging.StreamLog
-import kotlinx.coroutines.CoroutineScope
 import java.util.Date
 import java.util.concurrent.ConcurrentHashMap
 
@@ -46,7 +45,6 @@ import java.util.concurrent.ConcurrentHashMap
  */
 @Suppress("UNCHECKED_CAST")
 internal class DistinctChatApi(
-    private val scope: CoroutineScope,
     internal val delegate: ChatApi,
 ) : ChatApi by delegate {
 
@@ -182,7 +180,7 @@ internal class DistinctChatApi(
         callBuilder: () -> Call<T>,
     ): Call<T> {
         return distinctCalls[uniqueKey] as? DistinctCall<T>
-            ?: DistinctCall(scope, callBuilder, uniqueKey) {
+            ?: DistinctCall(callBuilder, uniqueKey) {
                 distinctCalls.remove(uniqueKey)
             }.also {
                 distinctCalls[uniqueKey] = it

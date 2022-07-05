@@ -251,7 +251,7 @@ internal open class BaseChatModule(
         buildRetrofitApi<ConfigApi>(),
         networkScope,
     ).let { originalApi ->
-        DistinctChatApiEnabler(DistinctChatApi(networkScope, originalApi)) {
+        DistinctChatApiEnabler(DistinctChatApi(originalApi)) {
             chatConfig.distinctApiCalls
         }
     }.let { originalApi ->

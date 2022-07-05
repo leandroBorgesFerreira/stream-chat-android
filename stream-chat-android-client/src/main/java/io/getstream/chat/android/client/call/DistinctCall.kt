@@ -17,21 +17,17 @@
 package io.getstream.chat.android.client.call
 
 import io.getstream.chat.android.client.utils.Result
-import io.getstream.chat.android.core.internal.coroutines.DispatcherProvider
 import io.getstream.logging.StreamLog
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
+
 /**
  * Reusable wrapper around [Call] which delivers a single result to all subscribers.
  */
 internal class DistinctCall<T : Any>(
-    private val scope: CoroutineScope,
     internal val callBuilder: () -> Call<T>,
     private val uniqueKey: Int,
     private val onFinished: () -> Unit,
@@ -44,18 +40,38 @@ internal class DistinctCall<T : Any>(
     private val delegate = AtomicReference<Call<T>>()
     private val isRunning = AtomicBoolean(false)
     private val subscribers = arrayListOf<Call.Callback<T>>()
-    private val calculatedResult = AtomicReference<Result<T>>()
 
     override fun execute(): Result<T> = runBlocking { await() }
 
     override fun enqueue(callback: Call.Callback<T>) {
         StreamLog.d(TAG) { "[enqueue] callback($$uniqueKey): $callback" }
-        subscribeCallback(callback)
-        scope.launch {
-            tryToRun {
-                suspendCoroutine { continuation ->
-                    this.enqueue { continuation.resume(it) }
+        subscribers.addCallback(callback)
+        if (isRunning.compareAndSet(false, true)) {
+            delegate.set(
+                callBuilder().apply {
+                    enqueue { result ->
+                        StreamLog.v(TAG) { "[enqueue] completed($uniqueKey)" }
+                        try {
+                            subscribers.notifyResult(result)
+                        } finally {
+                            doFinally()
+                        }
+                    }
                 }
+            )
+        }
+    }
+
+    override suspend fun await(): Result<T> {
+        StreamLog.d(TAG) { "[await] uniqueKey: $uniqueKey" }
+        return suspendCancellableCoroutine { continuation ->
+            enqueue { result ->
+                StreamLog.v(TAG) { "[await] completed($uniqueKey)" }
+                continuation.resume(result)
+            }
+            continuation.invokeOnCancellation {
+                StreamLog.v(TAG) { "[await] canceled($uniqueKey)" }
+                cancel()
             }
         }
     }
@@ -73,48 +89,31 @@ internal class DistinctCall<T : Any>(
         synchronized(subscribers) {
             subscribers.clear()
         }
-        println("Setting 'isRunning'' to false")
         isRunning.set(false)
         delegate.set(null)
         onFinished()
     }
 
+    private fun MutableList<Call.Callback<T>>.addCallback(callback: Call.Callback<T>) {
+        synchronized(lock = this) {
+            add(callback)
+        }
+    }
+
+    private fun List<Call.Callback<T>>.notifyResult(result: Result<T>) {
+        synchronized(lock = this) {
+            forEach { callback ->
+                try {
+                    callback.onResult(result)
+                } catch (_: Throwable) {
+                    /* no-op */
+                }
+            }
+        }
+    }
+
     private companion object {
         private const val TAG = "Chat:DistinctCall"
-    }
-
-    private fun initCall(): Call<T> = callBuilder().also { delegate.set(it) }
-
-    private fun subscribeCallback(callback: Call.Callback<T>) {
-        synchronized(subscribers) {
-            subscribers.add(callback)
-        }
-    }
-
-    private suspend fun notifyResult(result: Result<T>) = withContext(DispatcherProvider.Main) {
-        calculatedResult.set(result)
-        synchronized(subscribers) {
-            subscribers.forEach { it.onResult(result) }
-        }
-        withContext(DispatcherProvider.IO) { doFinally() }
-    }
-
-    private suspend fun tryToRun(command: suspend Call<T>.() -> Result<T>): Result<T>? =
-        (calculatedResult.get()
-            ?: if (!isRunning.getAndSet(true)) {
-                println("Call was not running. New value: ${isRunning.get()}")
-                initCall().command()
-            } else {
-                null
-            }
-            )?.also { notifyResult(it) }
-
-
-    override suspend fun await(): Result<T> = withContext(DispatcherProvider.IO) {
-        tryToRun { this.await() }
-            ?: suspendCoroutine { continuation ->
-                subscribeCallback { continuation.resume(it) }
-            }
     }
 }
 
