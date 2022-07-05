@@ -77,8 +77,8 @@ internal class DistinctCall<T : Any>(
     }
 
     override fun cancel() {
+        StreamLog.d(TAG) { "[cancel] uniqueKey: $uniqueKey" }
         try {
-            StreamLog.d(TAG) { "[cancel] uniqueKey: $uniqueKey" }
             delegate.get()?.cancel()
         } finally {
             doFinally()
@@ -86,6 +86,7 @@ internal class DistinctCall<T : Any>(
     }
 
     private fun doFinally() {
+        StreamLog.v(TAG) { "[doFinally] uniqueKey: $uniqueKey" }
         synchronized(subscribers) {
             subscribers.clear()
         }
