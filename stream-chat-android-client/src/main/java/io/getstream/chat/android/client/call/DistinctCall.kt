@@ -18,18 +18,26 @@ package io.getstream.chat.android.client.call
 
 import io.getstream.chat.android.client.utils.Result
 import io.getstream.logging.StreamLog
-import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeout
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
-import kotlin.coroutines.resume
 
 /**
  * Reusable wrapper around [Call] which delivers a single result to all subscribers.
  */
 internal class DistinctCall<T : Any>(
+    scope: CoroutineScope,
     private val uniqueKey: Int,
+    private val timeoutInMillis: Long = TIMEOUT,
     private val callBuilder: () -> Call<T>,
     private val onFinished: () -> Unit,
 ) : Call<T> {
@@ -38,9 +46,9 @@ internal class DistinctCall<T : Any>(
         StreamLog.i(TAG) { "<init> uniqueKey: $uniqueKey" }
     }
 
-    private val delegate = AtomicReference<Call<T>>()
-    private val isRunning = AtomicBoolean(false)
-    private val subscribers = arrayListOf<Call.Callback<T>>()
+    private val distinctScope = scope + SupervisorJob(scope.coroutineContext.job)
+    private val deferred = AtomicReference<Deferred<Result<T>>>()
+    private val running = AtomicBoolean(false)
 
     internal fun originCall(): Call<T> = callBuilder()
 
@@ -48,33 +56,33 @@ internal class DistinctCall<T : Any>(
 
     override fun enqueue(callback: Call.Callback<T>) {
         StreamLog.d(TAG) { "[enqueue] callback($$uniqueKey): $callback" }
-        subscribers.addCallback(callback)
-        if (isRunning.compareAndSet(false, true)) {
-            delegate.set(
-                callBuilder().also { originCall ->
-                    originCall.enqueue { result ->
-                        StreamLog.v(TAG) { "[enqueue] completed($uniqueKey)" }
-                        try {
-                            subscribers.notifyResult(result)
-                        } finally {
-                            doFinally()
-                        }
-                    }
-                }
-            )
+        distinctScope.launch {
+            val result = await()
+            StreamLog.v(TAG) { "[enqueue] completed($uniqueKey)" }
+            callback.onResult(result)
         }
     }
 
-    override suspend fun await(): Result<T> {
+    override suspend fun await(): Result<T> = try {
         StreamLog.d(TAG) { "[await] uniqueKey: $uniqueKey" }
-        return suspendCancellableCoroutine { continuation ->
-            enqueue { result ->
-                StreamLog.v(TAG) { "[await] completed($uniqueKey)" }
-                continuation.resume(result)
-            }
-            continuation.invokeOnCancellation {
-                StreamLog.v(TAG) { "[await] canceled($uniqueKey)" }
-                cancel()
+        if (running.compareAndSet(false, true)) {
+            deferred.set(callBuilder().awaitAsync())
+        }
+        deferred.get()?.await()
+            ?.also { StreamLog.v(TAG) { "[await] completed($uniqueKey)" } }
+            ?: error("no deferred found")
+    } catch (e: Throwable) {
+        StreamLog.v(TAG) { "[await] failed($uniqueKey)" }
+        Result.error(e)
+    } finally {
+        doFinally()
+    }
+
+    private fun Call<T>.awaitAsync(): Deferred<Result<T>> = distinctScope.async {
+        StreamLog.d(TAG) { "[awaitAsync] uniqueKey($uniqueKey)" }
+        withTimeout(timeoutInMillis) {
+            await().also {
+                StreamLog.v(TAG) { "[awaitAsync] completed($uniqueKey)" }
             }
         }
     }
@@ -82,8 +90,7 @@ internal class DistinctCall<T : Any>(
     override fun cancel() {
         StreamLog.d(TAG) { "[cancel] uniqueKey: $uniqueKey" }
         try {
-            delegate.get()?.cancel()
-            subscribers.notifyResult(Result.error(CancellationException("DistinctCall($uniqueKey) was canceled")))
+            distinctScope.coroutineContext.cancelChildren()
         } finally {
             doFinally()
         }
@@ -91,33 +98,13 @@ internal class DistinctCall<T : Any>(
 
     private fun doFinally() {
         StreamLog.v(TAG) { "[doFinally] uniqueKey: $uniqueKey" }
-        synchronized(subscribers) {
-            subscribers.clear()
-        }
-        isRunning.set(false)
-        delegate.set(null)
+        deferred.set(null)
+        running.set(false)
         onFinished()
-    }
-
-    private fun MutableList<Call.Callback<T>>.addCallback(callback: Call.Callback<T>) {
-        synchronized(lock = this) {
-            add(callback)
-        }
-    }
-
-    private fun List<Call.Callback<T>>.notifyResult(result: Result<T>) {
-        synchronized(lock = this) {
-            forEach { callback ->
-                try {
-                    callback.onResult(result)
-                } catch (_: Throwable) {
-                    /* no-op */
-                }
-            }
-        }
     }
 
     private companion object {
         private const val TAG = "Chat:DistinctCall"
+        private const val TIMEOUT = 60_000L
     }
 }

@@ -25,6 +25,7 @@ import io.getstream.chat.android.test.positiveRandomInt
 import io.getstream.logging.StreamLog
 import io.getstream.logging.kotlin.KotlinStreamLogger
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
@@ -38,6 +39,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 private const val TAG = "DistinctCallTest"
+private const val TIMEOUT = 60_000L
 
 internal class DistinctCallTest {
 
@@ -67,7 +69,7 @@ internal class DistinctCallTest {
             delay(1000)
         }
         val spyCallBuilder = SpyCallBuilder(testCall)
-        val call = DistinctCall(uniqueKey, spyCallBuilder) {
+        val call = DistinctCall(testCoroutines.scope, uniqueKey, TIMEOUT, spyCallBuilder) {
             finished.set(true)
         }
 
@@ -85,13 +87,13 @@ internal class DistinctCallTest {
     }
 
     @Test
-    fun deadLock() = runTest(dispatchTimeoutMs = 5_000) {
+    fun testCancellation() = runTest(dispatchTimeoutMs = 5_000) {
         val finished = AtomicBoolean(false)
         val testCall = AsyncTestCall(testCoroutines.scope, expectedResult) {
             delay(1500)
         }
         val spyCallBuilder = SpyCallBuilder(testCall)
-        val distinctCall = DistinctCall(uniqueKey, spyCallBuilder) {
+        val distinctCall = DistinctCall(testCoroutines.scope, uniqueKey, TIMEOUT, spyCallBuilder) {
             finished.set(true)
         }
 
@@ -115,6 +117,34 @@ internal class DistinctCallTest {
             actualResult.isError `should be equal to` true
             val error = actualResult.error()
             error.cause `should be instance of` CancellationException::class.java
+        }
+    }
+
+    @Test
+    fun testTimeout() = runTest {
+        val finished = AtomicBoolean(false)
+        val testCall = AsyncTestCall(testCoroutines.scope, expectedResult) {
+            delay(25_000)
+        }
+        val spyCallBuilder = SpyCallBuilder(testCall)
+        val distinctCall = DistinctCall(testCoroutines.scope, uniqueKey, 20_000, spyCallBuilder) {
+            finished.set(true)
+        }
+
+        val deferred = (0..positiveRandomInt(10)).map { index ->
+            async {
+                distinctCall.await()
+            }.also {
+                StreamLog.v(TAG) { "[deadLock] async($index) scheduled" }
+            }
+        }
+
+        deferred.forEach {
+            val actualResult = it.await()
+            StreamLog.d(TAG) { "[deadLock] actualResult: ${actualResult.stringify { it }}" }
+            actualResult.isError `should be equal to` true
+            val error = actualResult.error()
+            error.cause `should be instance of` TimeoutCancellationException::class.java
         }
     }
 
