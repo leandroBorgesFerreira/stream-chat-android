@@ -180,7 +180,7 @@ internal class DistinctChatApi(
         callBuilder: () -> Call<T>,
     ): Call<T> {
         return distinctCalls[uniqueKey] as? DistinctCall<T>
-            ?: DistinctCall(callBuilder, uniqueKey) {
+            ?: DistinctCall(uniqueKey, callBuilder) {
                 distinctCalls.remove(uniqueKey)
             }.also {
                 distinctCalls[uniqueKey] = it

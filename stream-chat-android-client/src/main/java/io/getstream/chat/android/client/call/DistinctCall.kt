@@ -18,6 +18,7 @@ package io.getstream.chat.android.client.call
 
 import io.getstream.chat.android.client.utils.Result
 import io.getstream.logging.StreamLog
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.concurrent.atomic.AtomicBoolean
@@ -28,8 +29,8 @@ import kotlin.coroutines.resume
  * Reusable wrapper around [Call] which delivers a single result to all subscribers.
  */
 internal class DistinctCall<T : Any>(
-    internal val callBuilder: () -> Call<T>,
     private val uniqueKey: Int,
+    private val callBuilder: () -> Call<T>,
     private val onFinished: () -> Unit,
 ) : Call<T> {
 
@@ -41,6 +42,8 @@ internal class DistinctCall<T : Any>(
     private val isRunning = AtomicBoolean(false)
     private val subscribers = arrayListOf<Call.Callback<T>>()
 
+    internal fun originCall(): Call<T> = callBuilder()
+
     override fun execute(): Result<T> = runBlocking { await() }
 
     override fun enqueue(callback: Call.Callback<T>) {
@@ -48,8 +51,8 @@ internal class DistinctCall<T : Any>(
         subscribers.addCallback(callback)
         if (isRunning.compareAndSet(false, true)) {
             delegate.set(
-                callBuilder().apply {
-                    enqueue { result ->
+                callBuilder().also { originCall ->
+                    originCall.enqueue { result ->
                         StreamLog.v(TAG) { "[enqueue] completed($uniqueKey)" }
                         try {
                             subscribers.notifyResult(result)
@@ -80,6 +83,7 @@ internal class DistinctCall<T : Any>(
         StreamLog.d(TAG) { "[cancel] uniqueKey: $uniqueKey" }
         try {
             delegate.get()?.cancel()
+            subscribers.notifyResult(Result.error(CancellationException("DistinctCall($uniqueKey) was canceled")))
         } finally {
             doFinally()
         }
@@ -117,4 +121,3 @@ internal class DistinctCall<T : Any>(
         private const val TAG = "Chat:DistinctCall"
     }
 }
-

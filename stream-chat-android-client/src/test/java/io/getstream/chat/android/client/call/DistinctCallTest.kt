@@ -1,23 +1,43 @@
+/*
+ * Copyright (c) 2014-2022 Stream.io Inc. All rights reserved.
+ *
+ * Licensed under the Stream License;
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    https://github.com/GetStream/stream-chat-android/blob/main/LICENSE
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.getstream.chat.android.client.call
 
-import io.getstream.chat.android.client.BlockedCall
 import io.getstream.chat.android.client.Mother
 import io.getstream.chat.android.client.utils.Result
+import io.getstream.chat.android.client.utils.stringify
 import io.getstream.chat.android.test.AsyncTestCall
 import io.getstream.chat.android.test.TestCoroutineExtension
 import io.getstream.chat.android.test.positiveRandomInt
 import io.getstream.logging.StreamLog
 import io.getstream.logging.kotlin.KotlinStreamLogger
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import org.amshove.kluent.`should be equal to`
+import org.amshove.kluent.`should be instance of`
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+
+private const val TAG = "DistinctCallTest"
 
 internal class DistinctCallTest {
 
@@ -33,7 +53,11 @@ internal class DistinctCallTest {
     @BeforeEach
     fun setup() {
         StreamLog.setValidator { _, _ -> true }
-        StreamLog.setLogger(KotlinStreamLogger())
+        StreamLog.setLogger(
+            KotlinStreamLogger(
+                now = { testCoroutines.dispatcher.scheduler.currentTime }
+            )
+        )
     }
 
     @Test
@@ -43,7 +67,7 @@ internal class DistinctCallTest {
             delay(1000)
         }
         val spyCallBuilder = SpyCallBuilder(testCall)
-        val call = DistinctCall(spyCallBuilder, uniqueKey) {
+        val call = DistinctCall(uniqueKey, spyCallBuilder) {
             finished.set(true)
         }
 
@@ -61,32 +85,37 @@ internal class DistinctCallTest {
     }
 
     @Test
-    fun Deadlock() = runTest {
-        val heavyCall = BlockedCall(expectedResult)
-        val spyCallBuilder = SpyCallBuilder(heavyCall)
-        val call = DistinctCall(spyCallBuilder, uniqueKey) { }
+    fun deadLock() = runTest(dispatchTimeoutMs = 5_000) {
+        val finished = AtomicBoolean(false)
+        val testCall = AsyncTestCall(testCoroutines.scope, expectedResult) {
+            delay(1500)
+        }
+        val spyCallBuilder = SpyCallBuilder(testCall)
+        val distinctCall = DistinctCall(uniqueKey, spyCallBuilder) {
+            finished.set(true)
+        }
 
-        val deferredResult = (0..positiveRandomInt(10)).map { index ->
+        val deferred = (0..positiveRandomInt(10)).map { index ->
             async {
-                call.await().also {
-                    if (index % 2 == 0) {
-                        // Call is canceled randomly
-                        call.cancel()
-                    }
-                }
+                distinctCall.await()
+            }.also {
+                StreamLog.v(TAG) { "[deadLock] async($index) scheduled" }
             }
         }
 
-        // HeavyCall is completed
-        heavyCall.unblock()
+        delay(100)
 
-        deferredResult.forEach {
-            // We want to check the deferred result we launch before from another part of our code that doesn't know the call was cancelled
-            it.await() `should be equal to` expectedResult
+        distinctCall.cancel()
+
+        delay(100)
+
+        deferred.forEach {
+            val actualResult = it.await()
+            StreamLog.d(TAG) { "[deadLock] actualResult: ${actualResult.stringify { it }}" }
+            actualResult.isError `should be equal to` true
+            val error = actualResult.error()
+            error.cause `should be instance of` CancellationException::class.java
         }
-        println("This message won't be shown because some pending call will be stopped forever")
-
-        // Test will fail because `runTest { }` has 60 seconds timeout
     }
 
     private class SpyCallBuilder<T : Any>(
