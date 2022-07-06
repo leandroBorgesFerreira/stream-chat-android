@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.resume
 
-public class AsyncTestCall<T : Any>(
+public class MockRetrofitCall<T : Any>(
     public val scope: CoroutineScope,
     public val result: Result<T>,
     public val doWork: suspend () -> Unit,

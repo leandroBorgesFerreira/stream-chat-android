@@ -19,7 +19,7 @@ package io.getstream.chat.android.client.call
 import io.getstream.chat.android.client.Mother
 import io.getstream.chat.android.client.utils.Result
 import io.getstream.chat.android.client.utils.stringify
-import io.getstream.chat.android.test.AsyncTestCall
+import io.getstream.chat.android.test.MockRetrofitCall
 import io.getstream.chat.android.test.TestCoroutineExtension
 import io.getstream.chat.android.test.positiveRandomInt
 import io.getstream.logging.StreamLog
@@ -65,7 +65,7 @@ internal class DistinctCallTest {
     @Test
     fun `Call should be executed asynchronous and return a valid result`() = runTest {
         val finished = AtomicBoolean(false)
-        val testCall = AsyncTestCall(testCoroutines.scope, expectedResult) {
+        val testCall = MockRetrofitCall(testCoroutines.scope, expectedResult) {
             delay(1000)
         }
         val spyCallBuilder = SpyCallBuilder(testCall)
@@ -89,7 +89,7 @@ internal class DistinctCallTest {
     @Test
     fun testCancellation() = runTest(dispatchTimeoutMs = 5_000) {
         val finished = AtomicBoolean(false)
-        val testCall = AsyncTestCall(testCoroutines.scope, expectedResult) {
+        val testCall = MockRetrofitCall(testCoroutines.scope, expectedResult) {
             delay(1500)
         }
         val spyCallBuilder = SpyCallBuilder(testCall)
@@ -123,8 +123,10 @@ internal class DistinctCallTest {
     @Test
     fun testTimeout() = runTest {
         val finished = AtomicBoolean(false)
-        val testCall = AsyncTestCall(testCoroutines.scope, expectedResult) {
-            delay(25_000)
+        val testCall = MockRetrofitCall(testCoroutines.scope, expectedResult) {
+            while(true) {
+                delay(60_000L)
+            }
         }
         val spyCallBuilder = SpyCallBuilder(testCall)
         val distinctCall = DistinctCall(testCoroutines.scope, uniqueKey, 20_000, spyCallBuilder) {
