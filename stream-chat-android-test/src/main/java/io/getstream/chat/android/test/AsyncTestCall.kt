@@ -42,8 +42,8 @@ public class AsyncTestCall<T : Any>(
     override fun cancel() {
         job.get()?.cancel()
         job.set(null)
-        // pendingCallback.get()?.onResult(Result.error(AsyncTestCallCanceledException()))
-        // pendingCallback.set(null)
+        pendingCallback.get()?.onResult(Result.error(AsyncTestCallCanceledException()))
+        pendingCallback.set(null)
     }
 
     override fun enqueue(callback: Call.Callback<T>) {
