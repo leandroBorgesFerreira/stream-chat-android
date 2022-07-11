@@ -21,6 +21,7 @@ import io.getstream.chat.android.client.Mother
 import io.getstream.chat.android.client.utils.Result
 import io.getstream.chat.android.test.TestCoroutineExtension
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import org.amshove.kluent.`should be equal to`
 import org.junit.jupiter.api.Test
@@ -60,14 +61,15 @@ internal class CoroutineCallTest {
         val blockedTask = BlockedTask(validResult)
         val call = CoroutineCall(testCoroutines.scope, blockedTask.getSuspendTask())
 
-        val deferedResult = async { call.execute() }
+        val deferredResult = async { call.await() }
+        delay(100L) // let async to get started
         call.cancel()
         blockedTask.unblock()
-        val result = deferedResult.await()
+        val result = deferredResult.await()
 
         result `should be equal to` Call.callCanceledError()
         blockedTask.isStarted() `should be equal to` true
-        blockedTask.isCompleted() `should be equal to` true
+        blockedTask.isCompleted() `should be equal to` false // cancel prevents completed to be True
     }
 
     @Test
@@ -94,6 +96,7 @@ internal class CoroutineCallTest {
         val call = CoroutineCall(testCoroutines.scope, blockedTask.getSuspendTask())
 
         call.enqueue(callback)
+        delay(100L)
         call.cancel()
         blockedTask.unblock()
 
@@ -119,13 +122,14 @@ internal class CoroutineCallTest {
         val blockedTask = BlockedTask(validResult)
         val call = CoroutineCall(testCoroutines.scope, blockedTask.getSuspendTask())
 
-        val deferedResult = async { call.await() }
+        val deferredResult = async { call.await() }
+        delay(100L) // let async to get started
         call.cancel()
         blockedTask.unblock()
-        val result = deferedResult.await()
+        val result = deferredResult.await()
 
         result `should be equal to` Call.callCanceledError()
         blockedTask.isStarted() `should be equal to` true
-        blockedTask.isCompleted() `should be equal to` true
+        blockedTask.isCompleted() `should be equal to` false // cancel prevents completed to be True
     }
 }
