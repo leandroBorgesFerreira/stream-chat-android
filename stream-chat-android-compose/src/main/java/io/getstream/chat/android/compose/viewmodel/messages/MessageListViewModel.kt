@@ -255,7 +255,12 @@ public class MessageListViewModel(
     private fun observeChannel() {
         viewModelScope.launch {
             channelState.filterNotNull().collectLatest { channelState ->
-                combine(channelState.messagesState, user, channelState.reads) { state, user, reads ->
+                combine(
+                    channelState.messagesState,
+                    user,
+                    channelState.reads,
+                    channelState.unreadCount
+                ) { state, user, reads, unreadCount ->
                     when (state) {
                         is io.getstream.chat.android.offline.plugin.state.channel.MessagesState.NoQueryActive,
                         is io.getstream.chat.android.offline.plugin.state.channel.MessagesState.Loading,
@@ -279,7 +284,8 @@ public class MessageListViewModel(
                                 startOfMessages = channelState.endOfNewerMessages.value,
                                 currentUser = user,
                                 isLoadingMoreNewMessages = false,
-                                isLoadingMoreOldMessages = false
+                                isLoadingMoreOldMessages = false,
+                                unreadCount = unreadCount ?: messagesState.unreadCount
                             )
                         }
                     }
@@ -301,7 +307,6 @@ public class MessageListViewModel(
 
                             newState.copy(
                                 newMessageState = newMessageState,
-                                unreadCount = getUnreadMessageCount(newMessageState),
                             )
                         } else {
                             newState
@@ -982,6 +987,7 @@ public class MessageListViewModel(
      * or "New Message" actions in the list or simply scrolls to the bottom.
      */
     public fun clearNewMessageState() {
+        if (!messagesState.startOfMessages) return
         threadMessagesState = threadMessagesState.copy(newMessageState = null, unreadCount = 0)
 
         messagesState = messagesState.copy(newMessageState = null, unreadCount = 0)
