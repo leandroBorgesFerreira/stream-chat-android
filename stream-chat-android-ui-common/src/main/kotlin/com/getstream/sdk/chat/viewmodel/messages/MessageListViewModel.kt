@@ -32,7 +32,6 @@ import io.getstream.chat.android.client.ChatClient
 import io.getstream.chat.android.client.call.Call
 import io.getstream.chat.android.client.call.enqueue
 import io.getstream.chat.android.client.errors.ChatError
-import io.getstream.chat.android.client.extensions.cidToTypeAndId
 import io.getstream.chat.android.client.logger.ChatLogger
 import io.getstream.chat.android.client.logger.TaggedLogger
 import io.getstream.chat.android.client.models.Attachment
@@ -47,7 +46,6 @@ import io.getstream.chat.android.common.messagelist.MessageListController
 import io.getstream.chat.android.common.state.DeletedMessageVisibility
 import io.getstream.chat.android.common.state.MessageFooterVisibility
 import io.getstream.chat.android.common.state.MessageMode
-import io.getstream.chat.android.offline.extensions.cancelEphemeralMessage
 import io.getstream.chat.android.offline.extensions.globalState
 import io.getstream.chat.android.offline.extensions.loadMessageById
 import io.getstream.chat.android.offline.extensions.setMessageForReply
@@ -58,8 +56,9 @@ import io.getstream.chat.android.offline.plugin.state.channel.thread.ThreadState
 import io.getstream.chat.android.offline.plugin.state.global.GlobalState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import io.getstream.chat.android.livedata.utils.Event as EventWrapper
 
@@ -142,7 +141,7 @@ public class MessageListViewModel(
      * @see Mode
      */
     public val mode: LiveData<Mode> = messageListController.mode.map {
-        when(it) {
+        when (it) {
             is MessageMode.MessageThread -> Mode.Thread(it.parentMessage, it.threadState)
             MessageMode.Normal -> Mode.Normal
         }
@@ -173,12 +172,7 @@ public class MessageListViewModel(
     /**
      *  The current channel used to load the message list data.
      */
-    private val _channel = MediatorLiveData<Channel>()
-
-    /**
-     *  The current channel used to load the message list data.
-     */
-    public val channel: LiveData<Channel> = _channel
+    public val channel: LiveData<Channel> = messageListController.channel.asLiveData()
 
     /**
      * The target message that the list should scroll to.
@@ -284,15 +278,11 @@ public class MessageListViewModel(
             channelId = channelState.channelId
         )
 
-        val channelDataLiveData = channelState.channelData.asLiveData()
-        _channel.addSource(channelDataLiveData) {
-            _channel.value = channelState.toChannel()
-            // Channel should be propagated only once because it's used to initialize MessageListView
-            _channel.removeSource(channelDataLiveData)
-        }
-        val typingIds = channelState.typing
-            .map { (_, idList) -> idList }
-            .asLiveData()
+        channelState.channelData.onStart {
+            messageListController.setCurrentChannel(channelState.toChannel())
+        }.launchIn(viewModelScope)
+
+        val typingIds = messageListController.typingUsers.asLiveData()
 
         messageListData = MessageListItemLiveData(
             currentUser = user,
@@ -393,16 +383,7 @@ public class MessageListViewModel(
             }
 
             is Event.LastMessageRead -> {
-                cid.cidToTypeAndId().let { (channelType, channelId) ->
-                    chatClient.markRead(channelType, channelId).enqueue(
-                        onError = { chatError ->
-                            logger.logE(
-                                "Could not mark cid: $cid as read. Error message: ${chatError.message}. " +
-                                    "Cause message: ${chatError.cause?.message}"
-                            )
-                        }
-                    )
-                }
+                messageListController.markLastMessageRead()
             }
             is Event.ThreadModeEntered -> {
                 onThreadModeEntered(event.parentMessage)
@@ -411,76 +392,52 @@ public class MessageListViewModel(
                 onBackButtonPressed()
             }
             is Event.DeleteMessage -> {
-                chatClient.deleteMessage(event.message.id, event.hard)
-                    .enqueue(
-                        onError = { chatError ->
-                            logger.logE(
-                                "Could not delete message: ${chatError.message}, Hard: ${event.hard}. " +
-                                    "Cause: ${chatError.cause?.message}. If you're using OfflinePlugin, the message " +
-                                    "should be deleted in the database and it will be deleted in the backend when " +
-                                    "the SDK sync its information."
-                            )
-                        }
-                    )
+                messageListController.deleteMessage(event.message, event.hard)
             }
             is Event.FlagMessage -> {
-                chatClient.flagMessage(event.message.id).enqueue { result ->
+                messageListController.flagMessage(event.message) { result ->
                     event.resultHandler(result)
                     if (result.isError) {
-                        logger.logE("Could not flag message: ${result.error().message}")
                         _errorEvents.postValue(EventWrapper(ErrorEvent.FlagMessageError(result.error())))
                     }
                 }
             }
             is Event.PinMessage -> {
-                chatClient.pinMessage(Message(id = event.message.id)).enqueue(
-                    onError = { chatError ->
-                        logger.logE("Could not pin message: ${chatError.message}. Cause: ${chatError.cause?.message}")
-                        _errorEvents.postValue(EventWrapper(ErrorEvent.PinMessageError(chatError)))
+                messageListController.pinMessage(event.message) {
+                    if (it.isError) {
+                        _errorEvents.postValue(EventWrapper(ErrorEvent.PinMessageError(it.error())))
                     }
-                )
+                }
             }
             is Event.UnpinMessage -> {
-                chatClient.unpinMessage(Message(id = event.message.id)).enqueue(
-                    onError = { chatError ->
-                        logger.logE("Could not unpin message: ${chatError.message}. Cause: ${chatError.cause?.message}")
-                        _errorEvents.postValue(EventWrapper(ErrorEvent.UnpinMessageError(chatError)))
+                messageListController.unpinMessage(event.message) {
+                    if (it.isError) {
+                        _errorEvents.postValue(EventWrapper(ErrorEvent.UnpinMessageError(it.error())))
                     }
-                )
+                }
             }
             is Event.GiphyActionSelected -> {
                 onGiphyActionSelected(event)
             }
             is Event.RetryMessage -> {
-                val (channelType, channelId) = event.message.cid.cidToTypeAndId()
-                chatClient.sendMessage(channelType, channelId, event.message)
-                    .enqueue(
-                        onError = { chatError ->
-                            logger.logE(
-                                "(Retry) Could not send message: ${chatError.message}. " +
-                                    "Cause: ${chatError.cause?.message}"
-                            )
-                        }
-                    )
+                messageListController.resendMessage(event.message)
             }
             is Event.MessageReaction -> {
                 onMessageReaction(event.message, event.reactionType, event.enforceUnique)
             }
             is Event.MuteUser -> {
-                chatClient.muteUser(event.user.id).enqueue(
-                    onError = { chatError ->
-                        logger.logE("Could not mute user: ${chatError.message}")
-                        _errorEvents.postValue(EventWrapper(ErrorEvent.MuteUserError(chatError)))
+                messageListController.muteUser(event.user) {
+                    if (it.isError) {
+                        _errorEvents.postValue(EventWrapper(ErrorEvent.MuteUserError(it.error())))
                     }
-                )
+                }
             }
             is Event.UnmuteUser -> {
-                chatClient.unmuteUser(event.user.id).enqueue(
-                    onError = { chatError ->
-                        logger.logE("Could not unmute user: ${chatError.message}")
-                        _errorEvents.postValue(EventWrapper(ErrorEvent.UnmuteUserError(chatError)))
+                messageListController.unmuteUser(event.user) {
+                    if (it.isError) {
+                        _errorEvents.postValue(EventWrapper(ErrorEvent.UnmuteUserError(it.error())))
                     }
-                )
+                }
             }
             is Event.BlockUser -> {
                 val channelClient = chatClient.channel(cid)
@@ -635,38 +592,7 @@ public class MessageListViewModel(
      * @param event The type of action the user has selected.
      */
     private fun onGiphyActionSelected(event: Event.GiphyActionSelected) {
-        when (event.action) {
-            GiphyAction.SEND -> {
-                chatClient.sendGiphy(event.message).enqueue(
-                    onError = { chatError ->
-                        logger.logE(
-                            "Could not send giphy for message id: ${event.message.id}. " +
-                                "Error: ${chatError.message}. Cause: ${chatError.cause?.message}"
-                        )
-                    }
-                )
-            }
-            GiphyAction.SHUFFLE -> {
-                chatClient.shuffleGiphy(event.message).enqueue(
-                    onError = { chatError ->
-                        logger.logE(
-                            "Could not shuffle giphy for message id: ${event.message.id}. " +
-                                "Error: ${chatError.message}. Cause: ${chatError.cause?.message}"
-                        )
-                    }
-                )
-            }
-            GiphyAction.CANCEL -> {
-                chatClient.cancelEphemeralMessage(event.message).enqueue(
-                    onError = { chatError ->
-                        logger.logE(
-                            "Could not cancel giphy for message id: ${event.message.id}. " +
-                                "Error: ${chatError.message}. Cause: ${chatError.cause?.message}"
-                        )
-                    }
-                )
-            }
-        }
+        messageListController.performGiphyAction(event.action, event.message)
     }
 
     /**
@@ -738,33 +664,7 @@ public class MessageListViewModel(
             type = reactionType
             score = 1
         }
-        if (message.ownReactions.any { it.type == reactionType }) {
-            chatClient.deleteReaction(
-                messageId = message.id,
-                reactionType = reaction.type,
-                cid = cid
-            ).enqueue(
-                onError = { chatError ->
-                    logger.logE(
-                        "Could not delete reaction for message with id: ${reaction.messageId} " +
-                            "Error: ${chatError.message}. Cause: ${chatError.cause?.message}"
-                    )
-                }
-            )
-        } else {
-            chatClient.sendReaction(
-                enforceUnique = enforceUnique,
-                reaction = reaction,
-                cid = cid
-            ).enqueue(
-                onError = { chatError ->
-                    logger.logE(
-                        "Could not send reaction for message with id: ${reaction.messageId} " +
-                            "Error: ${chatError.message}. Cause: ${chatError.cause?.message}"
-                    )
-                }
-            )
-        }
+        messageListController.reactToMessage(reaction, message, enforceUnique)
     }
 
     /**
