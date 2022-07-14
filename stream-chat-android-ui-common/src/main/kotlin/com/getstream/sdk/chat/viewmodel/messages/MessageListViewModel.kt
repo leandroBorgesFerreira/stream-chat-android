@@ -41,6 +41,7 @@ import io.getstream.chat.android.client.models.Flag
 import io.getstream.chat.android.client.models.Message
 import io.getstream.chat.android.client.models.Reaction
 import io.getstream.chat.android.client.models.User
+import io.getstream.chat.android.client.setup.state.ClientState
 import io.getstream.chat.android.client.utils.Result
 import io.getstream.chat.android.common.messagelist.MessageListController
 import io.getstream.chat.android.common.state.DeletedMessageVisibility
@@ -53,7 +54,8 @@ import io.getstream.chat.android.offline.extensions.watchChannelAsState
 import io.getstream.chat.android.offline.plugin.state.channel.ChannelState
 import io.getstream.chat.android.offline.plugin.state.channel.MessagesState
 import io.getstream.chat.android.offline.plugin.state.channel.thread.ThreadState
-import io.getstream.chat.android.offline.plugin.state.global.GlobalState
+import io.getstream.logging.StreamLog
+import io.getstream.logging.TaggedLogger
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.launchIn
@@ -69,7 +71,7 @@ import io.getstream.chat.android.livedata.utils.Event as EventWrapper
  *
  * @param cid The full channel id, i.e. "messaging:123"
  * @param chatClient Entry point for all low-level operations.
- * @param globalState Global state of OfflinePlugin. Contains information
+ * @param clientState Client state of SDK that contains information such as the current user and connection state.
  * such as the current user, connection state, unread counts etc.
  */
 @Suppress("TooManyFunctions")
@@ -77,7 +79,7 @@ public class MessageListViewModel(
     private val cid: String,
     private val messageId: String? = null,
     private val chatClient: ChatClient = ChatClient.instance(),
-    private val globalState: GlobalState = chatClient.globalState,
+    private val clientState: ClientState = chatClient.clientState,
     private val messageListController: MessageListController = MessageListController(cid, chatClient),
 ) : ViewModel() {
 
@@ -201,13 +203,13 @@ public class MessageListViewModel(
     /**
      * The currently logged in user.
      */
-    public val user: LiveData<User?> = globalState.user.asLiveData()
+    public val user: LiveData<User?> = clientState.user.asLiveData()
 
     /**
      * The logger used to print to errors, warnings, information
      * and other things to log.
      */
-    private val logger: TaggedLogger = ChatLogger.get("MessageListViewModel")
+    private val logger: TaggedLogger = StreamLog.getLogger("Chat:MessageListViewModel")
 
     /**
      * Evaluates whether date separators should be added to the message list.
@@ -447,7 +449,7 @@ public class MessageListViewModel(
                     timeout = null,
                 ).enqueue(
                     onError = { chatError ->
-                        logger.logE("Could not block user: ${chatError.message}")
+                        logger.e { "Could not block user: ${chatError.message}" }
                         _errorEvents.postValue(EventWrapper(ErrorEvent.BlockUserError(chatError)))
                     }
                 )
@@ -455,20 +457,20 @@ public class MessageListViewModel(
             is Event.ReplyMessage -> {
                 chatClient.setMessageForReply(event.cid, event.repliedMessage).enqueue(
                     onError = { chatError ->
-                        logger.logE(
+                        logger.e {
                             "Could not reply message: ${chatError.message}. " +
                                 "Cause: ${chatError.cause?.message}"
-                        )
+                        }
                     }
                 )
             }
             is Event.DownloadAttachment -> {
                 event.downloadAttachmentCall().enqueue(
                     onError = { chatError ->
-                        logger.logE(
+                        logger.e {
                             "Attachment download error: ${chatError.message}. " +
                                 "Cause: ${chatError.cause?.message}"
-                        )
+                        }
                     }
                 )
             }
@@ -491,7 +493,7 @@ public class MessageListViewModel(
                             _targetMessage.value = result.data()
                         } else {
                             val error = result.error()
-                            logger.logE("Could not load message: ${error.message}. Cause: ${error.cause?.message}")
+                            logger.e { "Could not load message: ${error.message}. Cause: ${error.cause?.message}" }
                         }
                     }
                 }
@@ -514,14 +516,14 @@ public class MessageListViewModel(
 
                         chatClient.updateMessage(message).enqueue(
                             onError = { chatError ->
-                                logger.logE(
+                                logger.e {
                                     "Could not edit message to remove its attachments: ${chatError.message}. " +
                                         "Cause: ${chatError.cause?.message}"
-                                )
+                                }
                             }
                         )
                     } else {
-                        logger.logE("Could not load message: ${result.error()}")
+                        logger.e { "Could not load message: ${result.error()}" }
                     }
                 }
             }
@@ -537,7 +539,7 @@ public class MessageListViewModel(
                         onEvent(Event.ReplyMessage(cid, message))
                     } else {
                         val error = result.error()
-                        logger.logE("Could not load message to reply: ${error.message}. Cause: ${error.cause?.message}")
+                        logger.e { "Could not load message to reply: ${error.message}. Cause: ${error.cause?.message}" }
                     }
                 }
             }
@@ -618,7 +620,7 @@ public class MessageListViewModel(
                 messageListData?.loadingMoreNewMessagesChanged(false)
             }
         } else {
-            logger.logE("There's no base message to request more message at bottom of limit")
+            logger.e { "There's no base message to request more message at bottom of limit" }
         }
     }
 
