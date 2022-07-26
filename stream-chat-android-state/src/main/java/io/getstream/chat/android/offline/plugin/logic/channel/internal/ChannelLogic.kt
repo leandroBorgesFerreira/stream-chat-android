@@ -76,6 +76,7 @@ import io.getstream.chat.android.client.models.ChannelConfig
 import io.getstream.chat.android.client.models.ChannelUserRead
 import io.getstream.chat.android.client.models.Message
 import io.getstream.chat.android.client.models.User
+import io.getstream.chat.android.client.persistance.repository.RepositoryFacade
 import io.getstream.chat.android.client.plugin.listeners.QueryChannelListener
 import io.getstream.chat.android.client.query.pagination.AnyChannelPaginationRequest
 import io.getstream.chat.android.client.utils.Result
@@ -87,7 +88,6 @@ import io.getstream.chat.android.offline.model.querychannels.pagination.internal
 import io.getstream.chat.android.offline.plugin.state.channel.ChannelState
 import io.getstream.chat.android.offline.plugin.state.channel.internal.ChannelMutableState
 import io.getstream.chat.android.offline.plugin.state.channel.internal.ChannelMutableStateImpl
-import io.getstream.chat.android.offline.repository.builder.internal.RepositoryFacade
 import io.getstream.logging.StreamLog
 import java.util.Date
 
@@ -120,6 +120,8 @@ internal class ChannelLogic(
     }
 
     override suspend fun onQueryChannelRequest(channelType: String, channelId: String, request: QueryChannelRequest) {
+        if (request.isNotificationUpdate) return
+
         channelStateLogic.refreshMuteState()
 
         runChannelQueryOffline(request)
@@ -255,15 +257,15 @@ internal class ChannelLogic(
             if (request.filteringOlderMessages()) {
                 updateOldMessagesFromLocalChannel(channel)
             } else {
-                updateDataFromLocalChannel(channel)
+                updateDataFromLocalChannel(channel, request.isNotificationUpdate)
             }
         }
     }
 
-    private fun updateDataFromLocalChannel(localChannel: Channel) {
+    private fun updateDataFromLocalChannel(localChannel: Channel, isNotificationUpdate: Boolean) {
         localChannel.hidden?.let(channelStateLogic::setHidden)
         mutableState.hideMessagesBefore = localChannel.hiddenMessagesBefore
-        updateDataFromChannel(localChannel, scrollUpdate = true)
+        updateDataFromChannel(localChannel, scrollUpdate = true, isNotificationUpdate = isNotificationUpdate)
     }
 
     private fun updateOldMessagesFromLocalChannel(localChannel: Channel) {
@@ -289,8 +291,9 @@ internal class ChannelLogic(
         channel: Channel,
         shouldRefreshMessages: Boolean = false,
         scrollUpdate: Boolean = false,
+        isNotificationUpdate: Boolean = false,
     ) {
-        channelStateLogic.updateDataFromChannel(channel, shouldRefreshMessages, scrollUpdate)
+        channelStateLogic.updateDataFromChannel(channel, shouldRefreshMessages, scrollUpdate, isNotificationUpdate)
     }
 
     internal fun deleteMessage(message: Message) {
@@ -522,9 +525,7 @@ internal class ChannelLogic(
         StreamLog.d("Channel-Logic") { "[handleEvent] cid: $cid, event: $event" }
         when (event) {
             is NewMessageEvent -> {
-                if (!mutableState.insideSearch.value) {
-                    upsertEventMessage(event.message)
-                }
+                upsertEventMessage(event.message)
                 channelStateLogic.incrementUnreadCountIfNecessary(event.message)
                 channelStateLogic.setHidden(false)
             }

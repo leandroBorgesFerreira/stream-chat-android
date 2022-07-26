@@ -334,6 +334,9 @@ public class io/getstream/chat/android/offline/utils/Event {
 	public final fun peekContent ()Ljava/lang/Object;
 }
 
+public final class io/getstream/chat/android/offline/utils/internal/ChannelUtilsKt {
+}
+
 public final class io/getstream/chat/android/state/BuildConfig {
 	public static final field BUILD_TYPE Ljava/lang/String;
 	public static final field DEBUG Z
@@ -366,6 +369,5 @@ public final class io/getstream/chat/android/state/plugin/configuration/StatePlu
 public final class io/getstream/chat/android/state/plugin/factory/StreamStatePluginFactory : io/getstream/chat/android/client/plugin/factory/PluginFactory {
 	public fun <init> (Lio/getstream/chat/android/state/plugin/configuration/StatePluginConfig;Landroid/content/Context;)V
 	public fun get (Lio/getstream/chat/android/client/models/User;)Lio/getstream/chat/android/client/plugin/Plugin;
-	public final fun setRepositoryFactory (Lio/getstream/chat/android/client/persistance/repository/factory/RepositoryFactory;)V
 }
 
