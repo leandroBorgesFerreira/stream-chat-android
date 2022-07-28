@@ -60,6 +60,7 @@ public fun MessageListViewModel.bindView(
     }
 
     channel.observe(lifecycleOwner) {
+        println("init channel")
         view.init(it)
     }
     view.setEndRegionReachedHandler { onEvent(EndRegionReached) }
