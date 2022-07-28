@@ -110,9 +110,10 @@ public fun ChatClient.watchChannelAsState(
     cid: String,
     messageLimit: Int,
     coroutineScope: CoroutineScope = CoroutineScope(DispatcherProvider.IO),
+    skipMessages: Boolean = false
 ): StateFlow<ChannelState?> {
     return getStateOrNull(coroutineScope) {
-        requestsAsState(coroutineScope).watchChannel(cid, messageLimit)
+        requestsAsState(coroutineScope).watchChannel(cid, messageLimit, skipMessages)
     }
 }
 
