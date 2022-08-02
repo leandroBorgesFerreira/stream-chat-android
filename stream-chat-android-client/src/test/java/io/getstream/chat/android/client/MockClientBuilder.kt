@@ -112,7 +112,7 @@ internal class MockClientBuilder(
             retryPolicy = NoRetryPolicy(),
             appSettingsManager = mock(),
             chatSocketExperimental = mock(),
-            lifecycle = lifecycleOwner.lifecycle,
+            lifecycleObserver = StreamLifecycleObserver(lifecycleOwner.lifecycle),
             pluginFactories = emptyList(),
             repositoryFactoryProvider = NoOpRepositoryFactory.Provider,
             clientState = mock()

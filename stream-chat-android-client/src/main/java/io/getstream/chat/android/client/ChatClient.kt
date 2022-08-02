@@ -204,21 +204,18 @@ internal constructor(
     private val chatSocketExperimental: ChatSocketExperimental,
     private val pluginFactories: List<PluginFactory>,
     public val clientState: ClientState,
-    lifecycle: Lifecycle,
+    private val lifecycleObserver: StreamLifecycleObserver,
     private val repositoryFactoryProvider: RepositoryFactory.Provider,
 ) {
     private val logger = StreamLog.getLogger("Chat:Client")
     private val waitConnection = MutableSharedFlow<Result<ConnectionData>>()
     private val eventsObservable = ChatEventsObservable(socket, waitConnection, scope, chatSocketExperimental)
-    private val lifecycleObserver = StreamLifecycleObserver(
-        lifecycle,
-        object : LifecycleHandler {
-            override fun resume() = reconnectSocket()
-            override fun stopped() {
-                socket.releaseConnection()
-            }
+    private val lifecycleHandler = object : LifecycleHandler {
+        override fun resume() = reconnectSocket()
+        override fun stopped() {
+            socket.releaseConnection()
         }
-    )
+    }
 
     @InternalStreamChatApi
     public val repositoryFacade: RepositoryFacade
@@ -257,7 +254,7 @@ internal constructor(
                     val connectionId = event.connectionId
                     if (ToggleService.isSocketExperimental().not()) {
                         socketStateService.onConnected(connectionId)
-                        lifecycleObserver.observe()
+                        lifecycleObserver.observe(lifecycleHandler)
                     }
                     api.setConnection(user.id, connectionId)
                     notifications.onSetUser()
@@ -1071,7 +1068,7 @@ internal constructor(
                 repositoryFacade.clear()
                 userCredentialStorage.clear()
             }
-            lifecycleObserver.dispose()
+            lifecycleObserver.dispose(lifecycleHandler)
             appSettingsManager.clear()
             _repositoryFacade = null
             postponeCancelScope()
@@ -2763,7 +2760,7 @@ internal constructor(
                 retryPolicy = retryPolicy,
                 appSettingsManager = appSettingsManager,
                 chatSocketExperimental = module.experimentalSocket(),
-                lifecycle = lifecycle,
+                lifecycleObserver = module.lifecycleObserver,
                 pluginFactories = pluginFactories,
                 repositoryFactoryProvider = repositoryFactoryProvider
                     ?: pluginFactories

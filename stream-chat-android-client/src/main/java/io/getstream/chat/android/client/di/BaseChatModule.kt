@@ -20,6 +20,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import androidx.lifecycle.Lifecycle
 import com.moczul.ok2curl.CurlInterceptor
+import io.getstream.chat.android.client.StreamLifecycleObserver
 import io.getstream.chat.android.client.api.AnonymousApi
 import io.getstream.chat.android.client.api.AuthenticatedApi
 import io.getstream.chat.android.client.api.ChatApi
@@ -103,6 +104,7 @@ internal open class BaseChatModule(
         StreamFileUploader(buildRetrofitCdnApi())
     }
 
+    val lifecycleObserver: StreamLifecycleObserver by lazy { StreamLifecycleObserver(lifecycle) }
     val networkScope: CoroutineScope = CoroutineScope(DispatcherProvider.IO)
     val socketStateService: SocketStateService = SocketStateService()
     val userStateService: UserStateService = UserStateService()
