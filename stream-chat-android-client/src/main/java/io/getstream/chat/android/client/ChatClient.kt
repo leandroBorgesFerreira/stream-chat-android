@@ -2767,7 +2767,7 @@ internal constructor(
                         .filterIsInstance<RepositoryFactory.Provider>()
                         .firstOrNull()
                     ?: NoOpRepositoryFactory.Provider,
-                clientState = ClientStateImpl(module.networkLifecyclePublisher())
+                clientState = ClientStateImpl(module.networkStateProvider)
             )
         }
 
