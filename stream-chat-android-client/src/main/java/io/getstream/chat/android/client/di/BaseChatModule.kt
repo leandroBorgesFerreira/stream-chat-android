@@ -47,7 +47,6 @@ import io.getstream.chat.android.client.api2.endpoint.ModerationApi
 import io.getstream.chat.android.client.api2.endpoint.UserApi
 import io.getstream.chat.android.client.clientstate.SocketStateService
 import io.getstream.chat.android.client.clientstate.UserStateService
-import io.getstream.chat.android.client.experimental.socket.lifecycle.NetworkLifecyclePublisher
 import io.getstream.chat.android.client.helpers.CallPostponeHelper
 import io.getstream.chat.android.client.logger.ChatLogLevel
 import io.getstream.chat.android.client.logger.ChatLogger
@@ -125,9 +124,6 @@ internal open class BaseChatModule(
     fun socket(): ChatSocket = defaultSocket
 
     fun experimentalSocket() = chatSocketExperimental
-
-    fun networkLifecyclePublisher(): NetworkLifecyclePublisher =
-        NetworkLifecyclePublisher(appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager)
 
     @Deprecated(
         message = "Use StreamLog instead.",
