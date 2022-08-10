@@ -38,7 +38,7 @@ public sealed class DisconnectCause {
      * Happens when a critical error occurs. Connection can't be restored after such disconnection.
      * @param error Instance of [ChatNetworkError] as a reason of it.
      */
-    public class UnrecoverableError(public val error: ChatNetworkError?) : DisconnectCause()
+    public class UnrecoverableError(public val error: ChatNetworkError?, public val id: String? = null) : DisconnectCause()
 
     /**
      * Happens when disconnection has been done intentionally. E.g. we release connection when app went to background

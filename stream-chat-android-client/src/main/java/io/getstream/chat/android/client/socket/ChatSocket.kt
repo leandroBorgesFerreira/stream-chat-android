@@ -127,7 +127,12 @@ internal open class ChatSocket constructor(
                     connectionConf = null
                     networkStateProvider.unsubscribe(networkStateListener)
                     healthMonitor.stop()
-                    callListeners { it.onDisconnected(DisconnectCause.UnrecoverableError(newState.error)) }
+
+                    val randomId = randomString()
+
+                    logger.d { "PROPAGATING UnrecoverableError to listeners - ID: $randomId" }
+                    callListeners { it.onDisconnected(DisconnectCause.UnrecoverableError(newState.error, randomId)) }
+                    logger.d { "PROPAGATED UnrecoverableError to listeners - ID: $randomId" }
                 }
             }
         }
@@ -324,5 +329,13 @@ internal open class ChatSocket constructor(
         object DisconnectedByRequest : State() {
             override fun toString(): String = "DisconnectedByRequest"
         }
+    }
+}
+
+public fun randomString(size: Int = 20): String = buildString(capacity = size) {
+    val charPool: CharArray = (('a'..'z') + ('A'..'Z') + ('0'..'9')).toCharArray()
+
+    repeat(size) {
+        append(charPool.random())
     }
 }
