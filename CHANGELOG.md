@@ -10,6 +10,7 @@
 
 ## stream-chat-android-offline
 ### ⬆️ Improved
+- something1
 
 ### ✅ Added
 
