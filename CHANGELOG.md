@@ -26,6 +26,7 @@
 
 ## stream-chat-android-offline
 ### 🐞 Fixed
+- change4
 
 ### ⬆️ Improved
 
