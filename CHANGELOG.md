@@ -8,7 +8,7 @@ change1
 ### ✅ Added
 
 ### ⚠️ Changed
-
+change2 
 ### ❌ Removed
 
 ## stream-chat-android-client
