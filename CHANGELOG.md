@@ -1,12 +1,10 @@
 # UNRELEASED CHANGELOG
 ## Common changes for all artifacts
 ### 🐞 Fixed
-- change1
 
 ### ⬆️ Improved
 
 ### ✅ Added
-- change2
 
 ### ⚠️ Changed
 
@@ -110,6 +108,27 @@
 ### ⚠️ Changed
 
 ### ❌ Removed
+
+# August 16th, 2022 - 5.10.4
+## Common changes for all artifacts
+### 🐞 Fixed
+- change1
+
+### ✅ Added
+- change2
+
+## stream-chat-android-offline
+### 🐞 Fixed
+- change3
+- change4
+
+## stream-chat-android-compose
+### ⬆️ Improved
+- change5
+- change6
+
+### ❌ Removed
+- change7
 
 # August 16th, 2022 - 5.10.3
 ## Common changes for all artifacts
