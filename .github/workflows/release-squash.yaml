@@ -16,15 +16,16 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: release
+          fetch-depth: 0
       - name: Create squashed branch
         run: | 
           git fetch
-          git pull origin develop
           git checkout -b release-squash
           git reset $(git merge-base origin/develop $(git rev-parse --abbrev-ref HEAD))
       - name: Commit changes
         uses: EndBug/add-and-commit@v8
         with:        
+          add: '.'
           message: "AUTOMATION: Version Bump and CHANGELOG Update"
           default_author: github_actions
           push: false
