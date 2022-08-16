@@ -47,6 +47,7 @@
 
 ## stream-chat-android-ui-components
 ### 🐞 Fixed
+- change3
 
 ### ⬆️ Improved
 
