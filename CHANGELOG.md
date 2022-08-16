@@ -1,5 +1,14 @@
+# UNRELEASED CHANGELOG
 ## Common changes for all artifacts
+### 🐞 Fixed
+
+### ⬆️ Improved
+
+### ✅ Added
+
 ### ⚠️ Changed
+
+### ❌ Removed
 
 ## stream-chat-android-client
 ### 🐞 Fixed
@@ -8,21 +17,42 @@
 
 ### ✅ Added
 
+### ⚠️ Changed
+
+### ❌ Removed
+
 ## stream-chat-android-offline
+### 🐞 Fixed
+
 ### ⬆️ Improved
-- something1
 
 ### ✅ Added
 
 ### ⚠️ Changed
+
+### ❌ Removed
+
+## stream-chat-android-ui-common
+### 🐞 Fixed
+
+### ⬆️ Improved
+
+### ✅ Added
+
+### ⚠️ Changed
+
+### ❌ Removed
 
 ## stream-chat-android-ui-components
 ### 🐞 Fixed
 
+### ⬆️ Improved
+
 ### ✅ Added
-- something2 
 
 ### ⚠️ Changed
+
+### ❌ Removed
 
 ## stream-chat-android-compose
 ### 🐞 Fixed
@@ -30,7 +60,6 @@
 ### ⬆️ Improved
 
 ### ✅ Added
-- something3
 
 ### ⚠️ Changed
 
@@ -80,7 +109,7 @@
 
 ### ❌ Removed
 
-# August 16th, 2022 - 5.8.0
+# August 16th, 2022 - 5.9.0
 ## Common changes for all artifacts
 ### ⚠️ Changed
 - Updated external libraries version. Check the PR to get more details.[#3976](https://github.com/GetStream/stream-chat-android/pull/3976)
@@ -140,6 +169,7 @@
 
 ### ⚠️ Changed
 - `StreamDimens` constructor containing parameter `attachmentsContentImageHeight` has been deprecated. Please use the one without it. This has been done because images displayed by `ImageAttachmentContent` inside the message list now auto-size themselves intelligently according to their aspect ratio. If you wish to limit the maximum vertical height of such images, use `StreamDimens.attachmentsContentImageMaxHeight`.  [#4013](https://github.com/GetStream/stream-chat-android/pull/4013)
+
 
 # August 02th, 2022 - 5.7.0
 ## Common changes for all artifacts
