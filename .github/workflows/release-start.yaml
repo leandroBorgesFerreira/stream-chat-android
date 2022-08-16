@@ -38,11 +38,11 @@ jobs:
           message: "AUTOMATION: Version Bump and CHANGELOG Update"
           default_author: github_actions
           push: false
-      # - name: Push changes
-      #   uses: ad-m/github-push-action@master
-      #   with:
-      #     github_token: ${{ secrets.GITHUB_TOKEN }}
-      #     branch: release
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: release
       - name: Create GITHUB_TAG_RELEASE_VERSION 
         run: |
           ./gradlew version-print
