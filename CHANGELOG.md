@@ -2,6 +2,7 @@
 ## Common changes for all artifacts
 ### 🐞 Fixed
 - change1
+
 ### ⬆️ Improved
 
 ### ✅ Added
@@ -25,6 +26,7 @@
 ### 🐞 Fixed
 
 ### ⬆️ Improved
+- change2
 
 ### ✅ Added
 
