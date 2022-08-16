@@ -23,4 +23,4 @@ jobs:
           java-version: 11
       - name: Release build
         # assembleRelease for all modules, excluding non-library modules: samples, docs
-        echo: "lalalla"
+        run: echo "lalalla"
