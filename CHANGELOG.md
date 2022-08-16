@@ -8,11 +8,13 @@ change1
 ### ✅ Added
 
 ### ⚠️ Changed
-change2 
+change2
+
 ### ❌ Removed
 
 ## stream-chat-android-client
 ### 🐞 Fixed
+change3
 
 ### ⬆️ Improved
 
