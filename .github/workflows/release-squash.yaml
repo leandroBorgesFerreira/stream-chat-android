@@ -19,7 +19,7 @@ jobs:
       - name: Create squashed branch
         run: | 
           git fetch
-          git pull origin/develop
+          git pull origin develop
           git checkout -b release-squash
           git reset $(git merge-base origin/develop $(git rev-parse --abbrev-ref HEAD))
       - name: Commit changes
