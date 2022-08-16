@@ -1,12 +1,10 @@
 # UNRELEASED CHANGELOG
 ## Common changes for all artifacts
 ### 🐞 Fixed
-- change1
 
 ### ⬆️ Improved
 
 ### ✅ Added
-- change2
 
 ### ⚠️ Changed
 
@@ -14,7 +12,6 @@
 
 ## stream-chat-android-client
 ### 🐞 Fixed
-- change3
 
 ### ⬆️ Improved
 
