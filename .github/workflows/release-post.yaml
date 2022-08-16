@@ -23,7 +23,7 @@ jobs:
       - name: Push changes
         uses: ad-m/github-push-action@master
         with:
-          github_token: ${{ secrets.STREAM_PUBLIC_BOT_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           branch: main
   update_changelog:
     name: Update Changelog - Model
@@ -33,7 +33,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v3
         with:
-          ref: release
+          ref: release-squash
       - name: Update changelog
         run: ./gradlew changelog-add-model-section
       - name: Commit changes
@@ -45,7 +45,7 @@ jobs:
       - name: Push changes
         uses: ad-m/github-push-action@master
         with:
-          github_token: ${{ secrets.STREAM_PUBLIC_BOT_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           branch: release-squash
       - name: Create Pull Request
         uses: repo-sync/pull-request@v2
@@ -54,4 +54,4 @@ jobs:
           destination_branch: "develop"
           pr_title: "Release sync"
           pr_body: "Sync with release branch after the release happened"
-          github_token: ${{ secrets.STREAM_PUBLIC_BOT_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
