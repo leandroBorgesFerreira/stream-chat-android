@@ -131,8 +131,7 @@ public class MessageListViewModel(
     private val channelState: StateFlow<ChannelState?> = chatClient.watchChannelAsState(
         cid = channelId,
         messageLimit = messageLimit,
-        coroutineScope = viewModelScope,
-        skipMessages = true
+        coroutineScope = viewModelScope
     )
 
     /**

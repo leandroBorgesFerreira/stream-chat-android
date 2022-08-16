@@ -252,6 +252,7 @@ internal class ChannelStateLogicImpl(
         } else {
             val newMessages = parseMessages(listOf(message))
             updateLastMessageAtByNewMessages(newMessages.values)
+            mutableState.updateCachedMessages(parseCachedMessages(listOf(message)))
         }
     }
 
@@ -416,7 +417,8 @@ internal class ChannelStateLogicImpl(
                 "channel: Channel," +
                 "shouldRefreshMessages: Boolean," +
                 "scrollUpdate: Boolean," +
-                "isNotificationUpdate: Boolean" +
+                "isNotificationUpdate: Boolean," +
+                "skipMessages: Boolean" +
                 ")",
             imports = ["io.getstream.chat.android.offline.plugin.logic.channel.internal"]
         ),
@@ -453,6 +455,7 @@ internal class ChannelStateLogicImpl(
      * @param scrollUpdate Notifies that this is a scroll update. Only scroll updates will be accepted
      * when the user is searching in the channel.
      * @param isNotificationUpdate Whether the message list update is due to a new notification.
+     * @param skipMessages Whether to skip message upsertion or not.
      */
     override fun updateDataFromChannel(
         channel: Channel,
@@ -483,10 +486,23 @@ internal class ChannelStateLogicImpl(
             )
         ) {
             upsertMessages(channel.messages, shouldRefreshMessages)
+        } else {
+            upsertCachedMessages(channel.messages)
         }
 
         mutableState.lastMessageAt = channel.lastMessageAt
         mutableState.setChannelConfig(channel.config)
+    }
+
+    private fun upsertCachedMessages(messages: List<Message>) {
+        mutableState.updateCachedMessages(parseCachedMessages(messages))
+    }
+
+    private fun parseCachedMessages(messages: List<Message>): Map<String, Message> {
+        val currentMessages = mutableState.cachedMessages.value
+        return currentMessages + attachmentUrlValidator.updateValidAttachmentsUrl(messages, currentMessages)
+            .filter { newMessage -> isMessageNewerThanCurrent(currentMessages[newMessage.id], newMessage) }
+            .associateBy(Message::id)
     }
 
     /**
@@ -503,7 +519,7 @@ internal class ChannelStateLogicImpl(
         isScrollUpdate: Boolean,
         shouldRefreshMessages: Boolean
     ): Boolean {
-        return !isNotificationUpdate && (!isInsideSearch || isScrollUpdate || shouldRefreshMessages)
+        return (!isNotificationUpdate || mutableState.endOfNewerMessages.value) && (!isInsideSearch || isScrollUpdate || shouldRefreshMessages)
     }
 
     /**
@@ -549,7 +565,7 @@ internal class ChannelStateLogicImpl(
             shouldRefreshMessages = request.shouldRefresh,
             scrollUpdate = request.isFilteringMessages(),
             isNotificationUpdate = request.isNotificationUpdate,
-            request.skipMessages
+            skipMessages = request.skipMessages
         )
     }
 

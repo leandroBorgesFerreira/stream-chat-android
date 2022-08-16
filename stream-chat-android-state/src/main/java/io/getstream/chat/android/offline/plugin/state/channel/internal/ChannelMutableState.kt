@@ -169,4 +169,9 @@ internal interface ChannelMutableState : ChannelState {
      * Updates StateFlows related to typing updates.
      */
     fun updateTypingEvents(eventsMap: Map<String, TypingStartEvent>, typingEvent: TypingEvent)
+
+    // TODO
+    val cachedMessages: StateFlow<Map<String, Message>>
+    fun updateCachedMessages(messages: Map<String, Message>)
+
 }

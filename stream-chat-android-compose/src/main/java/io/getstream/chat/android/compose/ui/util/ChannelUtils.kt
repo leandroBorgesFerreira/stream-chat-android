@@ -31,7 +31,11 @@ import java.util.Date
  * @return Last message from the channel or null if it doesn't exist.
  */
 public fun Channel.getLastMessage(currentUser: User?): Message? =
-    messages.asSequence()
+    if (isInsideSearch) {
+        cachedMessages
+    } else {
+        messages
+    }.asSequence()
         .filter { it.createdAt != null || it.createdLocallyAt != null }
         .filter { it.deletedAt == null }
         .filter { !it.silent }

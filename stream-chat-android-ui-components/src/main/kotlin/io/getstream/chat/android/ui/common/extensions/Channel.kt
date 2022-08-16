@@ -27,7 +27,11 @@ import io.getstream.chat.android.ui.common.extensions.internal.isCurrentUser
  * @return Last message from the channel or null if it doesn't exist.
  */
 public fun Channel.getLastMessage(): Message? =
-    messages.asSequence()
+    if (isInsideSearch) {
+        cachedMessages
+    } else {
+        messages
+    }.asSequence()
         .filter { it.createdAt != null || it.createdLocallyAt != null }
         .filter { it.deletedAt == null }
         .filter { !it.silent }
