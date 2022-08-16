@@ -105,6 +105,7 @@
 
 ## stream-chat-android-pushprovider-xiaomi
 ### 🐞 Fixed
+- change6
 
 ### ⬆️ Improved
 
