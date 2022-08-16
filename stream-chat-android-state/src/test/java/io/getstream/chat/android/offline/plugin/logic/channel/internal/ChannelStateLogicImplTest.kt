@@ -39,8 +39,8 @@ import io.getstream.chat.android.test.randomDate
 import io.getstream.chat.android.test.randomDateAfter
 import io.getstream.chat.android.test.randomDateBefore
 import io.getstream.chat.android.test.randomInt
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import io.getstream.chat.android.test.randomString
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.amshove.kluent.`should be equal to`
 import org.amshove.kluent.`should not be equal to`
