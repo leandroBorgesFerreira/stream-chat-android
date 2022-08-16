@@ -62,12 +62,15 @@
 ### 🐞 Fixed
 
 ### ⬆️ Improved
+- change5
+- change6
 
 ### ✅ Added
 
 ### ⚠️ Changed
 
 ### ❌ Removed
+- change7
 
 ## stream-chat-android-markdown-transformer
 ### 🐞 Fixed
