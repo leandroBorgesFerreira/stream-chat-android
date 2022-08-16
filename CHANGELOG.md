@@ -14,6 +14,7 @@
 
 ## stream-chat-android-client
 ### 🐞 Fixed
+- change3
 
 ### ⬆️ Improved
 
