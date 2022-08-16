@@ -60,6 +60,7 @@
 
 ## stream-chat-android-compose
 ### 🐞 Fixed
+- change5
 
 ### ⬆️ Improved
 
