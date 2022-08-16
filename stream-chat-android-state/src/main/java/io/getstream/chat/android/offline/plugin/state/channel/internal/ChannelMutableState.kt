@@ -177,5 +177,4 @@ internal interface ChannelMutableState : ChannelState {
      * Updates the cached messages with new messages.
      */
     fun updateCachedMessages(messages: Map<String, Message>)
-
 }

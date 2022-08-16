@@ -519,7 +519,8 @@ internal class ChannelStateLogicImpl(
         isScrollUpdate: Boolean,
         shouldRefreshMessages: Boolean
     ): Boolean {
-        return (!isNotificationUpdate || mutableState.endOfNewerMessages.value) && (!isInsideSearch || isScrollUpdate || shouldRefreshMessages)
+        return (!isNotificationUpdate || mutableState.endOfNewerMessages.value) &&
+            (!isInsideSearch || isScrollUpdate || shouldRefreshMessages)
     }
 
     /**

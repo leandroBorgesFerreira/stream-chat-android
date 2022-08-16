@@ -82,37 +82,51 @@ internal class ChannelMutableStateImpl(
     /** raw version of messages. */
     override var rawMessages: Map<String, Message>
         get() = _messages.value
-        set(value) { _messages.value = value }
+        set(value) {
+            _messages.value = value
+        }
 
     /** raw version of reads. */
     override var rawReads: Map<String, ChannelUserRead>
         get() = _rawReads.value
-        set(value) { _rawReads.value = value }
+        set(value) {
+            _rawReads.value = value
+        }
 
     /** raw version of reads. */
     override var rawMembers: Map<String, Member>
         get() = _members.value
-        set(value) { _members.value = value }
+        set(value) {
+            _members.value = value
+        }
 
     /** raw version of old messages. */
     override var rawOldMessages: Map<String, Message>
         get() = _oldMessages.value
-        set(value) { _oldMessages.value = value }
+        set(value) {
+            _oldMessages.value = value
+        }
 
     /** raw version of old watchers. */
     override var rawWatchers: Map<String, User>
         get() = _watchers.value
-        set(value) { _watchers.value = value }
+        set(value) {
+            _watchers.value = value
+        }
 
     /** raw version of typing. */
     override var rawTyping: Map<String, TypingStartEvent>
         get() = _typingChatEvents.value
-        set(value) { _typingChatEvents.value = value }
+        set(value) {
+            _typingChatEvents.value = value
+        }
 
     /** the date of the last message */
     override var lastMessageAt: Date?
         get() = _lastMessageAt.value
-        set(value) { _lastMessageAt.value = value }
+        set(value) {
+            _lastMessageAt.value = value
+        }
 
     /** Channel config data. */
     private val _channelConfig: MutableStateFlow<Config> = MutableStateFlow(Config())
@@ -192,14 +206,26 @@ internal class ChannelMutableStateImpl(
 
     override val membersCount: StateFlow<Int> = _membersCount
 
-    override val channelData: StateFlow<ChannelData> = combine(_channelData.filterNotNull(), latestUsers, _insideSearch) { channelData, users, inisdeSearch ->
-            if (users.containsKey(channelData.createdBy.id)) {
-                channelData.copy(createdBy = users[channelData.createdBy.id] ?: channelData.createdBy)
-            } else {
-                channelData
-            }
+    override val channelData: StateFlow<ChannelData> = combine(
+        _channelData.filterNotNull(),
+        latestUsers,
+    ) { channelData, users ->
+        if (users.containsKey(channelData.createdBy.id)) {
+            channelData.copy(createdBy = users[channelData.createdBy.id] ?: channelData.createdBy)
+        } else {
+            channelData
         }
-            .stateIn(scope, SharingStarted.Eagerly, ChannelData(type = channelType, channelId = channelId, cachedMessages = _cacheMessages.value.values.toList(), insideSearch = _insideSearch.value))
+    }
+        .stateIn(
+            scope = scope,
+            started = SharingStarted.Eagerly,
+            initialValue = ChannelData(
+                type = channelType,
+                channelId = channelId,
+                cachedMessages = _cacheMessages.value.values.toList(),
+                insideSearch = _insideSearch.value
+            )
+        )
 
     override val hidden: StateFlow<Boolean> = _hidden
     override val muted: StateFlow<Boolean> = _muted
@@ -288,9 +314,13 @@ internal class ChannelMutableStateImpl(
 
     override fun setInsideSearch(isInsideSearch: Boolean) {
         when {
-            isInsideSearch && !_insideSearch.value -> { cacheMessages() }
+            isInsideSearch && !_insideSearch.value -> {
+                cacheMessages()
+            }
 
-            !isInsideSearch && _insideSearch.value -> { _cacheMessages.value = emptyMap() }
+            !isInsideSearch && _insideSearch.value -> {
+                _cacheMessages.value = emptyMap()
+            }
         }
 
         _insideSearch.value = isInsideSearch
