@@ -1,4 +1,4 @@
-# August 16th, 2022 - 5.10.1
+# August 16th, 2022 - 5.10.2
 ## Common changes for all artifacts
 ### 🐞 Fixed
 - change1
@@ -20,6 +20,7 @@
 ## stream-chat-android-ui-common
 ### 🐞 Fixed
 - change5
+
 
 # August 16th, 2022 - 5.10.0
 ## Common changes for all artifacts
