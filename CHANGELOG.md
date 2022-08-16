@@ -1,115 +1,23 @@
-# UNRELEASED CHANGELOG
+# August 16th, 2022 - 5.10.4
 ## Common changes for all artifacts
 ### 🐞 Fixed
 - change1
 
-### ⬆️ Improved
-
 ### ✅ Added
 - change2
 
-### ⚠️ Changed
-
-### ❌ Removed
-
-## stream-chat-android-client
-### 🐞 Fixed
-
-### ⬆️ Improved
-
-### ✅ Added
-
-### ⚠️ Changed
-
-### ❌ Removed
-
 ## stream-chat-android-offline
 ### 🐞 Fixed
-
-### ⬆️ Improved
-
-### ✅ Added
-
-### ⚠️ Changed
-
-### ❌ Removed
-
-## stream-chat-android-ui-common
-### 🐞 Fixed
-
-### ⬆️ Improved
-
-### ✅ Added
-
-### ⚠️ Changed
-
-### ❌ Removed
-
-## stream-chat-android-ui-components
-### 🐞 Fixed
-
-### ⬆️ Improved
-
-### ✅ Added
-
-### ⚠️ Changed
-
-### ❌ Removed
+- change3
+- change4
 
 ## stream-chat-android-compose
-### 🐞 Fixed
-
 ### ⬆️ Improved
-
-### ✅ Added
-
-### ⚠️ Changed
+- change5
+- change6
 
 ### ❌ Removed
-
-## stream-chat-android-markdown-transformer
-### 🐞 Fixed
-
-### ⬆️ Improved
-
-### ✅ Added
-
-### ⚠️ Changed
-
-### ❌ Removed
-
-## stream-chat-android-pushprovider-firebase
-### 🐞 Fixed
-
-### ⬆️ Improved
-
-### ✅ Added
-
-### ⚠️ Changed
-
-### ❌ Removed
-
-## stream-chat-android-pushprovider-huawei
-### 🐞 Fixed
-
-### ⬆️ Improved
-
-### ✅ Added
-
-### ⚠️ Changed
-
-### ❌ Removed
-
-## stream-chat-android-pushprovider-xiaomi
-### 🐞 Fixed
-
-### ⬆️ Improved
-
-### ✅ Added
-
-### ⚠️ Changed
-
-### ❌ Removed
+- change7
 
 # August 16th, 2022 - 5.10.3
 ## Common changes for all artifacts
