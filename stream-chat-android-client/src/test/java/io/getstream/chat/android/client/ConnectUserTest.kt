@@ -26,14 +26,19 @@ import io.getstream.chat.android.client.events.ErrorEvent
 import io.getstream.chat.android.client.models.ConnectionData
 import io.getstream.chat.android.client.models.EventType
 import io.getstream.chat.android.client.models.GuestUser
+import io.getstream.chat.android.client.models.InitializationState
 import io.getstream.chat.android.client.models.User
 import io.getstream.chat.android.client.persistance.repository.noop.NoOpRepositoryFactory
+import io.getstream.chat.android.client.setup.state.ClientState
+import io.getstream.chat.android.client.setup.state.internal.ClientStateImpl
 import io.getstream.chat.android.client.utils.TokenUtils
 import io.getstream.chat.android.client.utils.observable.FakeSocket
 import io.getstream.chat.android.test.TestCoroutineExtension
 import io.getstream.chat.android.test.asCall
 import io.getstream.chat.android.test.randomString
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.plus
 import kotlinx.coroutines.test.runTest
 import org.amshove.kluent.`should be equal to`
 import org.junit.jupiter.api.BeforeEach
@@ -65,6 +70,7 @@ internal class ConnectUserTest {
     private val user = User(id = userId)
     private val anonId = "!anon"
     private val anonUser = User(id = anonId)
+    private val clientState: ClientState = ClientStateImpl(mock())
 
     @BeforeEach
     fun setup() {
@@ -94,7 +100,7 @@ internal class ConnectUserTest {
             lifecycle = lifecycleOwner.lifecycle,
             pluginFactories = emptyList(),
             repositoryFactoryProvider = NoOpRepositoryFactory.Provider,
-            clientState = mock()
+            clientState = clientState
         )
     }
 
@@ -107,6 +113,29 @@ internal class ConnectUserTest {
         result.isError `should be equal to` true
         result.error().message `should be equal to`
             "The user_id provided on the JWT token doesn't match with the current user you try to connect"
+    }
+
+    @Test
+    fun `When connection is successful, initialisation state should be updated`() = runTest {
+        val connectionId = randomString()
+        val event = ConnectedEvent(EventType.HEALTH_CHECK, Date(), user, connectionId)
+
+        val deferred = testCoroutines.scope.async { client.connectUser(user, jwt).await() }
+        socket.sendEvent(event)
+        val result = deferred.await()
+
+        result.isSuccess `should be equal to` true
+        clientState.initializationState.value `should be equal to` InitializationState.COMPLETE
+    }
+
+    @Test
+    fun `When connection is running, initialisation state should be updated`() = runTest {
+        val connectionId = randomString()
+        val event = ConnectedEvent(EventType.HEALTH_CHECK, Date(), user, connectionId)
+
+        client.connectUser(user, jwt).enqueue()
+
+        clientState.initializationState.value `should be equal to` InitializationState.RUNNING
     }
 
     @Test
@@ -139,7 +168,10 @@ internal class ConnectUserTest {
         val messageError = randomString()
         val event = ErrorEvent(EventType.HEALTH_CHECK, Date(), ChatError(message = messageError))
 
-        val deferred = testCoroutines.scope.async { client.connectUser(user, jwt).await() }
+        val localScope = testCoroutines.scope + Job()
+        val deferred = localScope.async {
+            client.connectUser(user, jwt).await()
+        }
         socket.sendEvent(event)
         val result = deferred.await()
 
@@ -197,7 +229,8 @@ internal class ConnectUserTest {
         val event = ErrorEvent(EventType.HEALTH_CHECK, Date(), ChatError(message = messageError))
 
         whenever(chatApi.getGuestUser(user.id, user.name)) doReturn GuestUser(user, jwt).asCall()
-        val deferred = testCoroutines.scope.async { client.connectGuestUser(user.id, user.name).await() }
+        val localScope = testCoroutines.scope + Job()
+        val deferred = localScope.async { client.connectGuestUser(user.id, user.name).await() }
         socket.sendEvent(event)
         val result = deferred.await()
 
@@ -225,7 +258,8 @@ internal class ConnectUserTest {
         val messageError = randomString()
         val event = ErrorEvent(EventType.HEALTH_CHECK, Date(), ChatError(message = messageError))
 
-        val deferred = testCoroutines.scope.async { client.connectAnonymousUser().await() }
+        val localScope = testCoroutines.scope + Job()
+        val deferred = localScope.async { client.connectAnonymousUser().await() }
         socket.sendEvent(event)
         val result = deferred.await()
 

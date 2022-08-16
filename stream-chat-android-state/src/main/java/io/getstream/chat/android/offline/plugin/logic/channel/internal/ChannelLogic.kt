@@ -455,8 +455,7 @@ internal class ChannelLogic(
      * @return [Message] if exists and wasn't hidden, null otherwise.
      */
     internal fun getMessage(messageId: String): Message? {
-        val copy = mutableState.messageList.value
-        var message = copy.firstOrNull { it.id == messageId }
+        var message = mutableState.rawMessages[messageId]?.copy()
 
         if (mutableState.hideMessagesBefore != null) {
             if (message != null && message.wasCreatedBeforeOrAt(mutableState.hideMessagesBefore)) {

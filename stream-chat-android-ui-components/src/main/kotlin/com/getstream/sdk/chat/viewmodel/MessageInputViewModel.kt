@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+@file:Suppress("DEPRECATION_ERROR")
+
 package com.getstream.sdk.chat.viewmodel
 
 import androidx.lifecycle.LiveData
@@ -126,7 +128,8 @@ public class MessageInputViewModel @JvmOverloads constructor(
      */
     public var typingUpdatesBuffer: TypingUpdatesBuffer = DefaultTypingUpdatesBuffer(
         onTypingStarted = ::keystroke,
-        onTypingStopped = ::stopTyping
+        onTypingStopped = ::stopTyping,
+        coroutineScope = viewModelScope
     )
 
     /**

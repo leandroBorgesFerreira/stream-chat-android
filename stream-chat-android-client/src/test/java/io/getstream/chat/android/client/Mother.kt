@@ -19,10 +19,14 @@ package io.getstream.chat.android.client
 import com.flextrade.jfixture.JFixture
 import com.flextrade.kfixture.KFixture
 import io.getstream.chat.android.client.events.UserPresenceChangedEvent
+import io.getstream.chat.android.client.logger.ChatLogLevel
+import io.getstream.chat.android.client.logger.ChatLoggerConfig
+import io.getstream.chat.android.client.logger.ChatLoggerHandler
 import io.getstream.chat.android.client.models.Attachment
 import io.getstream.chat.android.client.models.Channel
 import io.getstream.chat.android.client.models.ConnectionState
 import io.getstream.chat.android.client.models.Device
+import io.getstream.chat.android.client.models.InitializationState
 import io.getstream.chat.android.client.models.Message
 import io.getstream.chat.android.client.models.Mute
 import io.getstream.chat.android.client.models.PushProvider
@@ -83,6 +87,9 @@ internal object Mother {
 
             override val initialized: StateFlow<Boolean> = MutableStateFlow(true)
 
+            override val initializationState: StateFlow<InitializationState> =
+                MutableStateFlow(InitializationState.COMPLETE)
+
             override val connectionState: StateFlow<ConnectionState> = MutableStateFlow(ConnectionState.CONNECTED)
 
             override val isOnline: Boolean = true
@@ -99,5 +106,10 @@ internal object Mother {
                 // Nothing to do
             }
         }
+    }
+
+    fun chatLoggerConfig(): ChatLoggerConfig = object : ChatLoggerConfig {
+        override val level: ChatLogLevel = ChatLogLevel.NOTHING
+        override val handler: ChatLoggerHandler? = null
     }
 }

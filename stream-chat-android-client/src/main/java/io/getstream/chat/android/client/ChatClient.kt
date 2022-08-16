@@ -96,6 +96,7 @@ import io.getstream.chat.android.client.models.EventType
 import io.getstream.chat.android.client.models.Filters
 import io.getstream.chat.android.client.models.Flag
 import io.getstream.chat.android.client.models.GuestUser
+import io.getstream.chat.android.client.models.InitializationState
 import io.getstream.chat.android.client.models.Member
 import io.getstream.chat.android.client.models.Message
 import io.getstream.chat.android.client.models.ModelFields
@@ -112,6 +113,7 @@ import io.getstream.chat.android.client.notifications.handler.NotificationHandle
 import io.getstream.chat.android.client.persistance.repository.RepositoryFacade
 import io.getstream.chat.android.client.persistance.repository.factory.RepositoryFactory
 import io.getstream.chat.android.client.persistance.repository.noop.NoOpRepositoryFactory
+import io.getstream.chat.android.client.plugin.DependencyResolver
 import io.getstream.chat.android.client.plugin.Plugin
 import io.getstream.chat.android.client.plugin.factory.PluginFactory
 import io.getstream.chat.android.client.plugin.listeners.ChannelMarkReadListener
@@ -149,13 +151,15 @@ import io.getstream.chat.android.client.user.storage.UserCredentialStorage
 import io.getstream.chat.android.client.utils.ProgressCallback
 import io.getstream.chat.android.client.utils.Result
 import io.getstream.chat.android.client.utils.TokenUtils
+import io.getstream.chat.android.client.utils.coroutine.cancelChildrenExcept
 import io.getstream.chat.android.client.utils.flatMapSuspend
 import io.getstream.chat.android.client.utils.internal.toggle.ToggleService
 import io.getstream.chat.android.client.utils.mapSuspend
 import io.getstream.chat.android.client.utils.mergePartially
 import io.getstream.chat.android.client.utils.observable.ChatEventsObservable
 import io.getstream.chat.android.client.utils.observable.Disposable
-import io.getstream.chat.android.client.utils.onError
+import io.getstream.chat.android.client.utils.onErrorSuspend
+import io.getstream.chat.android.client.utils.onSuccess
 import io.getstream.chat.android.client.utils.retry.NoRetryPolicy
 import io.getstream.chat.android.client.utils.retry.RetryPolicy
 import io.getstream.chat.android.client.utils.stringify
@@ -165,6 +169,8 @@ import io.getstream.logging.SilentStreamLogger
 import io.getstream.logging.StreamLog
 import io.getstream.logging.android.AndroidStreamLogger
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
@@ -235,9 +241,23 @@ internal constructor(
      *
      * @see [Plugin]
      */
+    @PublishedApi
     internal var plugins: List<Plugin> = emptyList()
 
     private var interceptors: MutableList<Interceptor> = mutableListOf()
+
+    /**
+     * Resolves dependency [T] within the provided plugin [P].
+     *
+     * @see [Plugin]
+     */
+    @InternalStreamChatApi
+    public inline fun <reified P : Plugin, reified T : Any> resolveDependency(): T? {
+        val resolver = plugins.find { plugin ->
+            plugin is P && plugin is DependencyResolver
+        } as? DependencyResolver
+        return resolver?.resolveDependency(T::class)
+    }
 
     /**
      * Error handlers for API calls.
@@ -250,16 +270,15 @@ internal constructor(
                 is ConnectedEvent -> {
                     val user = event.me
                     val connectionId = event.connectionId
+                    api.setConnection(user.id, connectionId)
                     if (ToggleService.isSocketExperimental().not()) {
                         socketStateService.onConnected(connectionId)
                         lifecycleObserver.observe()
                     }
-                    api.setConnection(user.id, connectionId)
                     notifications.onSetUser()
 
                     clientState.toMutableState()?.run {
                         setConnectionState(ConnectionState.CONNECTED)
-                        setInitialized(true)
                         setUser(user)
                     }
                 }
@@ -426,7 +445,11 @@ internal constructor(
                 logger.e { "[setUser] Failed to connect user. Please check you don't have connected user already." }
                 Result.error(ChatError("Failed to connect user. Please check you don't have connected user already."))
             }
-        }.onError { disconnect() }
+        }.onErrorSuspend {
+            disconnectSuspend(flushPersistence = true)
+        }.onSuccess {
+            clientState.toMutableState()?.setInitializionState(InitializationState.COMPLETE)
+        }
     }
 
     private fun initializeClientWithUser(
@@ -485,6 +508,7 @@ internal constructor(
         timeoutMilliseconds: Long? = null,
     ): Call<ConnectionData> {
         return CoroutineCall(scope) {
+            clientState.toMutableState()?.setInitializionState(InitializationState.RUNNING)
             logger.d { "[connectUser] userId: '${user.id}', username: '${user.name}'" }
             setUser(user, tokenProvider, timeoutMilliseconds).also { result ->
                 logger.v {
@@ -1046,26 +1070,34 @@ internal constructor(
     public fun disconnect(flushPersistence: Boolean): Call<Unit> =
         CoroutineCall(scope) {
             logger.d { "[disconnect] flushPersistence: $flushPersistence" }
-            notifications.onLogout()
-            clientState.toMutableState()?.clearState()
-            getCurrentUser().let(initializationCoordinator::userDisconnected)
-            if (ToggleService.isSocketExperimental().not()) {
-                socketStateService.onDisconnectRequested()
-                userStateService.onLogout()
-                socket.disconnect()
-            } else {
-                userStateService.onLogout()
-                chatSocketExperimental.disconnect(DisconnectCause.ConnectionReleased)
-            }
-            if (flushPersistence) {
-                repositoryFacade.clear()
-                userCredentialStorage.clear()
-            }
-            lifecycleObserver.dispose()
-            appSettingsManager.clear()
-            _repositoryFacade = null
+            disconnectSuspend(flushPersistence)
             Result.success(Unit)
         }
+
+    private suspend fun disconnectSuspend(flushPersistence: Boolean) {
+        logger.d { "[disconnectSuspend] flushPersistence: $flushPersistence" }
+        notifications.onLogout()
+        clientState.toMutableState()?.clearState()
+        clientState.toMutableState()?.setInitializionState(InitializationState.NOT_INITIALIZED)
+        getCurrentUser().let(initializationCoordinator::userDisconnected)
+        if (ToggleService.isSocketExperimental().not()) {
+            socketStateService.onDisconnectRequested()
+            userStateService.onLogout()
+            socket.disconnect()
+        } else {
+            userStateService.onLogout()
+            chatSocketExperimental.disconnect(DisconnectCause.ConnectionReleased)
+        }
+        if (flushPersistence) {
+            repositoryFacade.clear()
+            userCredentialStorage.clear()
+        }
+        lifecycleObserver.dispose()
+        appSettingsManager.clear()
+        _repositoryFacade = null
+        val currentJob = currentCoroutineContext()[Job]
+        scope.coroutineContext.cancelChildrenExcept(currentJob)
+    }
 
     /**
      * Disconnect the current user, stop all observers and clear user data
@@ -1075,7 +1107,7 @@ internal constructor(
             "Instead of that, you can use `ChatClient.disconnect(true)` that return a `Call` " +
             "and run it safe using coroutines.",
         replaceWith = ReplaceWith("this.disconnect(true).await()"),
-        level = DeprecationLevel.WARNING
+        level = DeprecationLevel.ERROR,
     )
     @WorkerThread
     public fun disconnect() {

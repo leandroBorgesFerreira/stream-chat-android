@@ -38,6 +38,8 @@ import io.getstream.chat.android.client.utils.internal.validateCidWithResult
 import io.getstream.chat.android.client.utils.map
 import io.getstream.chat.android.client.utils.toResultError
 import io.getstream.chat.android.core.internal.coroutines.DispatcherProvider
+import io.getstream.chat.android.offline.event.handler.chat.ChatEventHandler
+import io.getstream.chat.android.offline.event.handler.chat.factory.ChatEventHandlerFactory
 import io.getstream.chat.android.offline.extensions.internal.logic
 import io.getstream.chat.android.offline.extensions.internal.requestsAsState
 import io.getstream.chat.android.offline.plugin.state.StateRegistry
@@ -79,7 +81,12 @@ public val ChatClient.globalState: GlobalState
  * The [QueryChannelsState] cannot be created before connecting the user therefore, the method returns a StateFlow
  * that emits a null when the user has not been connected yet and the new value every time the user changes.
  *
+ * You can pass option [chatEventHandlerFactory] parameter which will be associated with this query channels request.
+ *
+ * @see [ChatEventHandler]
+ *
  * @param request The request's parameters combined into [QueryChannelsRequest] class.
+ * @param chatEventHandlerFactory The instance of [ChatEventHandlerFactory] that will be used to create [ChatEventHandler].
  * @param coroutineScope The [CoroutineScope] used for executing the request.
  *
  * @return A StateFlow object that emits a null when the user has not been connected yet and the new [QueryChannelsState] when the user changes.
@@ -87,10 +94,11 @@ public val ChatClient.globalState: GlobalState
 @JvmOverloads
 public fun ChatClient.queryChannelsAsState(
     request: QueryChannelsRequest,
+    chatEventHandlerFactory: ChatEventHandlerFactory = ChatEventHandlerFactory(clientState),
     coroutineScope: CoroutineScope = CoroutineScope(DispatcherProvider.IO),
 ): StateFlow<QueryChannelsState?> {
     return getStateOrNull(coroutineScope) {
-        requestsAsState(coroutineScope).queryChannels(request)
+        requestsAsState(coroutineScope).queryChannels(request, chatEventHandlerFactory)
     }
 }
 
@@ -265,64 +273,13 @@ public fun ChatClient.cancelEphemeralMessage(message: Message): Call<Boolean> {
         if (cidValidationResult.isSuccess) {
             try {
                 require(message.isEphemeral()) { "Only ephemeral message can be canceled" }
-                val (channelType, channelId) = message.cid.cidToTypeAndId()
-                logic.channel(channelType = channelType, channelId = channelId).removeLocalMessage(message)
+                logic.channelFromMessage(message)?.removeLocalMessage(message)
+                logic.threadFromMessage(message)?.removeLocalMessage(message)
                 repositoryFacade.deleteChannelMessage(message)
 
                 Result.success(true)
             } catch (exception: Exception) {
                 Result.error(exception)
-            }
-        } else {
-            cidValidationResult.error().toResultError()
-        }
-    }
-}
-
-/**
- * Loads message for a given message id and channel id.
- *
- * @param cid The full channel id i. e. messaging:123.
- * @param messageId The id of the message.
- * @param olderMessagesOffset How many new messages to load before the requested message.
- * @param newerMessagesOffset How many new messages to load after the requested message.
- *
- * @return Executable async [Call] responsible for loading a message.
- */
-@Deprecated(
-    "Use the version without offsets, as it uses less requests to backend.",
-    level = DeprecationLevel.ERROR,
-)
-public fun ChatClient.loadMessageById(
-    cid: String,
-    messageId: String,
-    olderMessagesOffset: Int,
-    newerMessagesOffset: Int,
-): Call<Message> {
-    return CoroutineCall(state.scope) {
-        val cidValidationResult = validateCidWithResult(cid)
-
-        if (cidValidationResult.isSuccess) {
-            val result = getMessage(messageId).await()
-
-            if (result.isSuccess) {
-                val message = result.data()
-                val (channelType, channelId) = cid.cidToTypeAndId()
-
-                logic.channel(channelType = channelType, channelId = channelId).run {
-                    storeMessageLocally(listOf(message))
-                    loadOlderMessages(newerMessagesOffset, messageId)
-                    loadNewerMessages(messageId, olderMessagesOffset)
-                    upsertMessages(listOf(message))
-                }
-                result
-            } else {
-                try {
-                    repositoryFacade.selectMessage(messageId)?.let(::Result)
-                        ?: Result(ChatError("Error while fetching message from backend. Message id: $messageId"))
-                } catch (exception: Exception) {
-                    Result.error(exception)
-                }
             }
         } else {
             cidValidationResult.error().toResultError()

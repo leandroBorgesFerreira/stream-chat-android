@@ -27,6 +27,7 @@ import io.getstream.chat.android.client.models.ChannelMute
 import io.getstream.chat.android.client.models.Filters
 import io.getstream.chat.android.client.models.User
 import io.getstream.chat.android.client.setup.state.ClientState
+import io.getstream.chat.android.offline.event.handler.chat.factory.ChatEventHandlerFactory
 import io.getstream.chat.android.offline.plugin.state.StateRegistry
 import io.getstream.chat.android.offline.plugin.state.global.internal.GlobalMutableState
 import io.getstream.chat.android.offline.plugin.state.querychannels.ChannelsStateData
@@ -192,7 +193,6 @@ internal class ChannelListViewModelTest {
                     loading = false
                 )
                 .givenChannelMutes()
-                .givenIsOffline(false)
                 .get()
 
             val mockObserver: Observer<ChannelListViewModel.State> = mock()
@@ -221,7 +221,6 @@ internal class ChannelListViewModelTest {
                     loading = false
                 )
                 .givenChannelMutes()
-                .givenIsOffline(true)
                 .get()
 
             val mockObserver: Observer<ChannelListViewModel.State> = mock()
@@ -267,10 +266,6 @@ internal class ChannelListViewModelTest {
             whenever(globalState.channelMutes) doReturn MutableStateFlow(channelMutes)
         }
 
-        fun givenIsOffline(isOffline: Boolean = false) = apply {
-            whenever(globalState.isOffline()) doReturn isOffline
-        }
-
         fun givenChannelsQuery(channels: List<Channel> = emptyList()) = apply {
             whenever(chatClient.queryChannels(any())) doReturn channels.asCall()
         }
@@ -312,6 +307,7 @@ internal class ChannelListViewModelTest {
                 chatClient = chatClient,
                 sort = initialSort,
                 filter = initialFilters,
+                chatEventHandlerFactory = ChatEventHandlerFactory(clientState = clientState)
             )
         }
     }
