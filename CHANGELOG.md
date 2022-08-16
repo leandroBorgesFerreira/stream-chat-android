@@ -39,6 +39,7 @@
 
 ## stream-chat-android-ui-common
 ### 🐞 Fixed
+- change6
 
 ### ⬆️ Improved
 
